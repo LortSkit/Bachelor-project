@@ -1,5 +1,5 @@
 pandas==1.4.0
-skforecast==0.4.3
+skforecast==0.6.0
 matplotlib==3.5.1
 numpy==1.22
 scikit-learn==1.0.2
