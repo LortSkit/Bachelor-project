@@ -42,7 +42,7 @@ def print_price_summary(series_battery):
 
 #Prints the all action sequences (along with other goodies) using the series_battery attained from logic_rollout
 def logic_series_print(series_battery):
-    print(f"{'hour':5s} {'price':8s} {'yield':8s} {'surplus':8s} {'buy':8s} {'charge':8s} {'before':8s} {'after':8s} {'cost':8s} {'cumsum':8s}")
+    print(f"{'hour':8s} {'price':8s} {'yield':8s} {'surplus':8s} {'buy':8s} {'charge':8s} {'before':8s} {'after':8s} {'cost':8s} {'cumsum':8s}")
 
     for i in range(len(series_battery)):
         spot    = series_battery.iloc[i]['SpotPriceDKK']/1000
@@ -54,7 +54,7 @@ def logic_series_print(series_battery):
         after   = series_battery.iloc[i]['capacity_after']
         cost    = series_battery.iloc[i]['price']
         cost_c  = series_battery.iloc[i]['price_cummulative']
-        print(f"{i:2d}: {spot:8.4f},{yieldd:8.4f},{surplus:8.4f},{buy:8.4f},{charge:8.4f},{before:8.4f},{after:8.4f},{cost:8.4f},{cost_c:8.4f}")
+        print(f"{i:5d}: {spot:8.4f},{yieldd:8.4f},{surplus:8.4f},{buy:8.4f},{charge:8.4f},{before:8.4f},{after:8.4f},{cost:8.4f},{cost_c:8.4f}")
         
         
 #DP functions
