@@ -1,5 +1,6 @@
 import numpy as np
 from Funcs_Logic_DP import get_price
+from copy import deepcopy
 
 class DPModel: 
     def __init__(self, N, Start, End, house, merged, battery): 
@@ -18,7 +19,7 @@ class DPModel:
             self.s[i] = int(self.s[i]*10)/10
         
     def f(self, x, u, w, k):
-        charge = u[0] #production and bought
+        charge = u[0] 
         
         self.battery.current_capacity = x
         self.battery.charge(charge)
@@ -41,16 +42,12 @@ class DPModel:
         yieldd = self.get_yield(k)
         amount = yieldd
         
-        #Degrade capacity
-        reset = self.battery.get_current_capacity() #Needed?
+        bat_copy=deepcopy(self.battery)
+        bat_copy.current_capacity = x
+        bat_copy.degrade(1)
+        bat_copy.current_capacity = int(bat_copy.current_capacity*10)/10 
         
-        self.battery.current_capacity = x
-        self.battery.degrade(1)
-        self.battery.current_capacity = int(self.battery.current_capacity*10)/10 
-        
-        x = self.battery.get_current_capacity()
-        
-        self.battery.current_capacity = reset       #Needed?
+        x = bat_copy.get_current_capacity()
         
         #Get the discharge to charge range (yield_bat_range)
         if yieldd <=0:
@@ -88,7 +85,7 @@ class DPModel:
             num_buying_states=0
         
         
-        actions = np.round(np.empty((len(yield_bat_range)+num_buying_states,2)),2)
+        actions = np.empty((len(yield_bat_range)+num_buying_states,2))
         
         no_buy = np.array([0 for i in range(len(yield_bat_range))])
         

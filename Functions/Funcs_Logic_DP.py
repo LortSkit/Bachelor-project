@@ -1,43 +1,7 @@
 import pandas as pd
 from dateutil.relativedelta import relativedelta
 from copy import deepcopy
-
-#Logic functions
-def logic_rollout(series_battery, battery, logic, get_price, actions=None):
-    
-    series_battery = series_battery.apply(lambda row: logic(row, battery, actions), axis=1)
-    series_battery["price"] = series_battery.apply(lambda row: get_price(row["surplus"], row["SpotPriceDKK"]/1000,0.1), axis=1)
-    series_battery["price_cummulative"] = series_battery["price"].cumsum(axis=0)
-    return series_battery
-
-def pred_logic_rollout(series_battery_true,series_battery_pred, battery, logic, get_price, actions=None):
-    
-    series_battery_pred = logic_rollout(series_battery_pred, deepcopy(battery), logic, get_price, actions)
-    
-    def logic_this(row, battery, actions):
-        power_yield = row["power_yield"]
-        charge = actions.loc[row.name]["charge"]
-        
-        if power_yield<=0:
-            buy=charge if charge>0 else 0
-        else:
-            if power_yield<charge:
-                buy=charge-power_yield
-            else:
-                buy=0.0
-        
-        battery.charge(charge)
-
-        row["capacity_before"] = battery.get_previous_capacity()
-        row["capacity_after"] = battery.get_current_capacity()
-        row["surplus"] = power_yield-charge
-        row["charge"] = charge
-        row["buy"] = buy
-        return row
-    
-    series_battery_true = logic_rollout(series_battery_true, battery, logic_this, get_price, series_battery_pred)
-    return series_battery_true
-    
+from Logic import logic_actions
 
 # Definge get price function   
 def get_price(demand, spot_price, percentage_cut):
@@ -49,7 +13,29 @@ def get_price(demand, spot_price, percentage_cut):
     else:
         return -demand * spot_price #Price zone DK1
 
+#Logic functions
+def logic_rollout(series_battery, battery, logic, actions=None):
+    
+    series_battery = series_battery.apply(lambda row: logic(row, battery, actions), axis=1)
+    series_battery["price"] = series_battery.apply(lambda row: get_price(row["surplus"], row["SpotPriceDKK"]/1000,0.1), axis=1)
+    series_battery["price_cummulative"] = series_battery["price"].cumsum(axis=0)
+    return series_battery
 
+def action_rollout(series_battery, battery, actions):
+    
+    series_battery = series_battery.apply(lambda row: logic_actions(row,battery,actions), axis=1)
+    series_battery["price"] = series_battery.apply(lambda row: get_price(row["surplus"], row["SpotPriceDKK"]/1000,0.1), axis=1)
+    series_battery["price_cummulative"] = series_battery["price"].cumsum(axis=0)
+    return series_battery
+    
+
+def pred_logic_rollout(series_battery_true,series_battery_pred, battery, logic, actions=None):
+    
+    series_battery_pred = logic_rollout(series_battery_pred, deepcopy(battery), logic, actions)
+    
+    series_battery_true = action_rollout(series_battery_true, battery, series_battery_pred)
+    return series_battery_true
+    
 def print_price_summary(series_battery):
     start, end = series_battery.index[0], series_battery.index[-1]
     difference_in_years = relativedelta(end, start).years
