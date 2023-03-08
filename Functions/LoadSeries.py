@@ -1,6 +1,6 @@
 import pandas as pd
 
-def loadSeries(datatype=None,house=None,rename=None, shifts=None):
+def load_series(datatype=None,house=None,rename=None, shifts=None):
     '''
     Loading data series from cf_filled (consumption) or pf_filled (production)
     
@@ -76,5 +76,5 @@ def loadSeries(datatype=None,house=None,rename=None, shifts=None):
 def moving_average(timeseries, window):
     return timeseries.rolling(window=window, center=True).mean()
 
-if __name__=="__main__":
-    print("This is meant to be imported")
+if __name__ == "__main__":
+    print("This file is meant to be imported")

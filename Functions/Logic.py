@@ -1,9 +1,8 @@
 # Simple logic battery
-def logic_bat(row, battery):
+def logic_bat(row, battery, actions=None): #actions only used for DP
     power_yield = row["power_yield"]
-    battery.charge(power_yield,True)
+    battery.charge(power_yield)
     
-    row["power_yield"] = power_yield
     row["capacity_before"] = battery.get_previous_capacity()
     row["capacity_after"] = battery.get_current_capacity()
     row["surplus"] = battery.get_surplus()
@@ -12,13 +11,12 @@ def logic_bat(row, battery):
     return row
 
 # DP logic (mostly to compare to the other logic based models)
-def logic_DP(row, battery):
+def logic_DP(row, battery, actions):
     power_yield = row["power_yield"]
-    charge = battery.actions.loc[row.name]["charge"]
-    buy = battery.actions.loc[row.name]["buy"]
-    battery.charge(charge,True)
+    charge = actions.loc[row.name]["charge"]
+    buy = actions.loc[row.name]["buy"]
+    battery.charge(charge)
     
-    row["power_yield"] = power_yield
     row["capacity_before"] = battery.get_previous_capacity()
     row["capacity_after"] = battery.get_current_capacity()
     row["surplus"] = power_yield-charge
@@ -27,4 +25,4 @@ def logic_DP(row, battery):
     return row
 
 if __name__ == "__main__":
-    print("This is a class meant to be imported")
+    print("This file is meant to be imported")

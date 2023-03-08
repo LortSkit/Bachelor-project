@@ -18,7 +18,7 @@ class Battery():
             warnings.warn(f"max_charge must be less than or equal to max_capcity! Setting max_charge = {self.max_capacity}")
             self.max_charge = self.max_capacity
 
-    def charge(self, amount: float, degrade: bool):
+    def charge(self, amount, degrade=True):
         #Degrade battery by 1 hour
         if degrade:
             self.degrade(1)
@@ -69,23 +69,23 @@ class Battery():
     def degrade(self, hours):
         self.current_capacity -= self.current_capacity * self.rate * hours
     
-    def get_surplus(self) -> float:
+    def get_surplus(self):
         return self.surplus
     
-    def get_previous_capacity(self) -> float:
+    def get_previous_capacity(self):
         return self.previous_capacity
     
-    def get_current_capacity(self) -> float:
+    def get_current_capacity(self):
         return self.current_capacity
     
-    def get_max_capacity(self) -> float:
+    def get_max_capacity(self):
         return self.max_capacity
     
-    def get_percentage(self) -> float:
+    def get_percentage(self):
         return self.current_capacity / self.max_capacity * 100
     
     def __str__(self):
         return f"Capacity: {self.current_capacity}, Surplus: {self.surplus}"
 
 if __name__ == "__main__":
-    print("This is a class meant to be imported")
+    print("This file is meant to be imported")

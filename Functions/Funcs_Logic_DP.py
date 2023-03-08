@@ -1,16 +1,46 @@
+import pandas as pd
 from dateutil.relativedelta import relativedelta
+from copy import deepcopy
+
 #Logic functions
-def logic_rollout(series_battery, battery, logic, get_price):
+def logic_rollout(series_battery, battery, logic, get_price, actions=None):
     
-    
-    series_battery = series_battery.apply(lambda row: logic(row, battery), axis=1)
-    series_battery["price"] = series_battery.apply(lambda row: get_price(row["surplus"], row.name, row["SpotPriceDKK"]/1000,0.1), axis=1)
+    series_battery = series_battery.apply(lambda row: logic(row, battery, actions), axis=1)
+    series_battery["price"] = series_battery.apply(lambda row: get_price(row["surplus"], row["SpotPriceDKK"]/1000,0.1), axis=1)
     series_battery["price_cummulative"] = series_battery["price"].cumsum(axis=0)
     return series_battery
 
+def pred_logic_rollout(series_battery_true,series_battery_pred, battery, logic, get_price, actions=None):
+    
+    series_battery_pred = logic_rollout(series_battery_pred, deepcopy(battery), logic, get_price, actions)
+    
+    def logic_this(row, battery, actions):
+        power_yield = row["power_yield"]
+        charge = actions.loc[row.name]["charge"]
+        
+        if power_yield<=0:
+            buy=charge if charge>0 else 0
+        else:
+            if power_yield<charge:
+                buy=charge-power_yield
+            else:
+                buy=0.0
+        
+        battery.charge(charge)
+
+        row["capacity_before"] = battery.get_previous_capacity()
+        row["capacity_after"] = battery.get_current_capacity()
+        row["surplus"] = power_yield-charge
+        row["charge"] = charge
+        row["buy"] = buy
+        return row
+    
+    series_battery_true = logic_rollout(series_battery_true, battery, logic_this, get_price, series_battery_pred)
+    return series_battery_true
+    
 
 # Definge get price function   
-def get_price(demand, timestamp, spot_price, percentage_cut):
+def get_price(demand, spot_price, percentage_cut):
 
     #Sell
     if demand > 0:
@@ -84,6 +114,8 @@ def policy_rollout(model, pi, x0):
         actions.append(u) # update the list of the actions
     
     J += model.gN(x)
+    actions = pd.DataFrame(actions,columns=['charge','buy'])
+    actions.index = pd.date_range(start=model.Start, end=model.End, freq="h")
     return J, trajectory, actions
 
 def DP_stochastic(model):
@@ -124,3 +156,6 @@ def DP_stochastic(model):
             pi[k][x] = pi_k(x)
             """
     return J, pi
+
+if __name__ == "__main__":
+    print("This file is meant to be imported")
