@@ -4,12 +4,13 @@ library(forecast)
 library(ggplot2)
 set.seed(0)
 
-df <- read.csv('pf_filled.csv')
-ind = 24*365
+df <- read.csv('cf_filled.csv')
+ind = 4380 
+# 24*(365/2)
 hf = df[0:ind,]
 
-sample_sizes = c(3000,2000,1000,500,100)
-start_inds = list(sample(c(4000:(ind-24)),size=5))
+sample_sizes = c(4000, 3000,2000,1000,500,100)
+start_inds = list(sample(c(4000:(ind-24)),size=15))
 
 mses <- c()
 method <- c()
@@ -21,7 +22,7 @@ for (sample_size in sample_sizes) {
   
   print(sample_size)
   
-  for (col in c('prod_k28','prod_h16','prod_h22','prod_h28','prod_h32')) {
+  for (col in c('cons_k28','cons_h16','cons_h22','cons_h28','cons_h32')) {
     i = 1
     print(col)
     
@@ -57,7 +58,7 @@ for (sample_size in sample_sizes) {
   }
 }
 
-write.csv(x,'C:/Users/vidis/OneDrive/Desktop/Spring23/BachelorProject/tuning.csv',row.names = FALSE)
+write.csv(x,'C:/Users/vidis/OneDrive/Desktop/Spring23/BachelorProject/cons_tuning.csv',row.names = FALSE)
 
   
 
