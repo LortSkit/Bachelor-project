@@ -13,19 +13,27 @@ def get_price(demand, spot_price, percentage_cut):
     else:
         return -demand * spot_price #Price zone DK1
 
+def get_emissions(surplus, degrade, emission):
+    
+    return (abs(surplus)+degrade)*emission
+
 #Logic functions
 def logic_rollout(series_battery, battery, logic, actions=None):
     
     series_battery = series_battery.apply(lambda row: logic(row, battery, actions), axis=1)
-    series_battery["price"] = series_battery.apply(lambda row: get_price(row["surplus"], row["SpotPriceDKK"]/1000,0.1), axis=1)
-    series_battery["price_cummulative"] = series_battery["price"].cumsum(axis=0)
+    series_battery["cost"] = series_battery.apply(lambda row: get_price(row["surplus"], row["SpotPriceDKK"]/1000,0.1), axis=1)
+    series_battery["emission"] = series_battery.apply(lambda row: get_emissions(row["surplus"],(row["capacity_before"]-row["capacity_degraded"]),row["CO2Emission"]/1000), axis=1)
+    series_battery["cost_cummulative"] = series_battery["cost"].cumsum(axis=0)
+    series_battery["emission_cummulative"] = series_battery["emission"].cumsum(axis=0)
     return series_battery
 
 def action_rollout(series_battery, battery, actions):
     
     series_battery = series_battery.apply(lambda row: logic_actions(row,battery,actions), axis=1)
-    series_battery["price"] = series_battery.apply(lambda row: get_price(row["surplus"], row["SpotPriceDKK"]/1000,0.1), axis=1)
-    series_battery["price_cummulative"] = series_battery["price"].cumsum(axis=0)
+    series_battery["cost"] = series_battery.apply(lambda row: get_price(row["surplus"], row["SpotPriceDKK"]/1000,0.1), axis=1)
+    series_battery["emission"] = series_battery.apply(lambda row: get_emissions(row["surplus"],(row["capacity_before"]-row["capacity_degraded"]),row["CO2Emission"]/1000), axis=1)
+    series_battery["cost_cummulative"] = series_battery["cost"].cumsum(axis=0)
+    series_battery["emission_cummulative"] = series_battery["emission"].cumsum(axis=0)
     return series_battery
     
 
@@ -36,41 +44,52 @@ def pred_logic_rollout(series_battery_true,series_battery_pred, battery, logic, 
     series_battery_true = action_rollout(series_battery_true, battery, series_battery_pred)
     return series_battery_true
     
-def print_price_summary(series_battery):
+def print_price_summary(series_battery,yearprint=True):
     start, end = series_battery.index[0], series_battery.index[-1]
     difference_in_years = relativedelta(end, start).years
-    print(f"Cost for period: {start} to {end} is: ", round(series_battery["price"].sum(), 0), " DKK")
+    print(f"The period is from {start} to {end}")
+    print(f"Cost for period: ", round(series_battery["cost"].sum(), 0), " DKK")
+    print(f"Total emissions for period: ", round(series_battery["emission"].sum(),0), " kg")
     num_wh_total = series_battery[series_battery["surplus"] < 0]["surplus"].sum()  
     num_wh_total_sold = series_battery[series_battery["surplus"] > 0]["surplus"].sum() 
 
     time_delta_seconds =  (end-start).total_seconds()
     years_timedelta = time_delta_seconds/(365.25*24*60*60)
-    print(f"Average cost per year is: {round(series_battery['price'].sum()/years_timedelta,0)} DKK")
+    
+    if yearprint:
+        print(f"Average cost per year is: {round(series_battery['cost'].sum()/years_timedelta,0)} DKK")
+        print(f"Average emissions per year is: {round(series_battery['emission'].sum()/years_timedelta,0)} kg")
 
     print(f"Number of kwh purchased in the period: {-num_wh_total}")
 
-    print(f"Average number of kwh purchased per year: {-num_wh_total/years_timedelta}")
+    if yearprint:
+        print(f"Average number of kwh purchased per year: {-num_wh_total/years_timedelta}")
        
-    print(f"Average number of kwh sold per year: {num_wh_total_sold/years_timedelta}")
+        print(f"Average number of kwh sold per year: {num_wh_total_sold/years_timedelta}")
+        
 
 
-    return round(series_battery['price'].sum()/years_timedelta,0),-num_wh_total/years_timedelta, num_wh_total_sold/years_timedelta
+    return round(series_battery['cost'].sum()/years_timedelta,0),-num_wh_total/years_timedelta, num_wh_total_sold/years_timedelta
 
 #Prints the all action sequences (along with other goodies) using the series_battery attained from logic_rollout
 def logic_series_print(series_battery):
-    print(f"{'hour':8s} {'price':8s} {'yield':8s} {'surplus':8s} {'buy':8s} {'charge':8s} {'before':8s} {'after':8s} {'cost':8s} {'cumsum':8s}")
+    print(f"{'hour':8s} {'price':8s} {'eprice':8s} {'yield':8s} {'surplus':8s} {'buy':8s} {'charge':8s} {'before':8s} {'degrade':8s} {'after':8s} {'cost':8s} {'pcumsum':8s} {'emis':8s} {'ecumsum':8s}")
 
     for i in range(len(series_battery)):
         spot    = series_battery.iloc[i]['SpotPriceDKK']/1000
+        eprice  = series_battery.iloc[i]['CO2Emission']/1000
         yieldd  = series_battery.iloc[i]['power_yield']
         surplus = series_battery.iloc[i]['surplus']
         buy     = series_battery.iloc[i]['buy']
         charge  = series_battery.iloc[i]['charge']
         before  = series_battery.iloc[i]['capacity_before']
+        degrade = series_battery.iloc[i]['capacity_degraded']
         after   = series_battery.iloc[i]['capacity_after']
-        cost    = series_battery.iloc[i]['price']
-        cost_c  = series_battery.iloc[i]['price_cummulative']
-        print(f"{i:5d}: {spot:8.4f},{yieldd:8.4f},{surplus:8.4f},{buy:8.4f},{charge:8.4f},{before:8.4f},{after:8.4f},{cost:8.4f},{cost_c:8.4f}")
+        cost    = series_battery.iloc[i]['cost']
+        emis    = series_battery.iloc[i]['emission']
+        cost_c  = series_battery.iloc[i]['cost_cummulative']
+        emis_c  = series_battery.iloc[i]['emission_cummulative']
+        print(f"{i:5d}: {spot:8.4f},{eprice:8.4f},{yieldd:8.4f},{surplus:8.4f},{buy:8.4f},{charge:8.4f},{before:8.4f},{degrade:8.4f},{after:8.4f},{cost:8.4f},{cost_c:8.4f},{emis:8.4f},{emis_c:8.4f}")
         
         
 #DP functions

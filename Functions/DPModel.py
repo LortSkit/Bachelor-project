@@ -1,5 +1,5 @@
 import numpy as np
-from Funcs_Logic_DP import get_price
+from Funcs_Logic_DP import get_price, get_emissions
 from copy import deepcopy
 
 class DPModel: 
@@ -107,7 +107,25 @@ class DPModel:
         return actions
     
     def get_yield(self,k):
-        return int((self.prod[k] - self.demand[k])*10)/10
+        return float(f"{self.prod[k] - self.demand[k]:.1f}")
 
+class DPModel2(DPModel):
+    def __init__(self, N, Start, End, house, merged, battery): 
+        super().__init__(N, Start, End, house, merged, battery)
+        self.ep = merged.loc[Start:End]["CO2Emission"]/1000
+    
+    def g(self, x, u, w, k):
+        yieldd = self.get_yield(k)
+        charge = u[0]
+        
+        bat_copy=deepcopy(self.battery)
+        bat_copy.current_capacity = x
+        bat_copy.degrade(1)
+        bat_copy.current_capacity = int(bat_copy.current_capacity*10)/10 
+        
+        x_after = bat_copy.get_current_capacity()
+        
+        return get_emissions(yieldd-charge,x-x_after,self.ep[k])
+    
 if __name__ == "__main__":
     print("This file is meant to be imported")

@@ -10,6 +10,7 @@ class Battery():
         self.max_charge = max_charge
         self.rate = degrade_rate
         self.previous_capacity = 0
+        self.previous_degraded_capacity = 0
         self.actions = actions
         
         #Require max_charge <= max_capacity
@@ -19,6 +20,8 @@ class Battery():
             self.max_charge = self.max_capacity
 
     def charge(self, amount, degrade=True):
+        self.previous_capacity = self.current_capacity
+        
         #Degrade battery by 1 hour
         if degrade:
             self.degrade(1)
@@ -27,7 +30,7 @@ class Battery():
         self.current_capacity = int(self.current_capacity*10)/10 
             
         capacity = self.get_current_capacity() #capacity after degrade, before charge/discharge
-        self.previous_capacity = capacity
+        self.previous_degraded_capacity = capacity
         extra_amount = 0
         
         if amount <=0:
@@ -74,6 +77,9 @@ class Battery():
     
     def get_previous_capacity(self):
         return self.previous_capacity
+    
+    def get_previous_degraded_capacity(self):
+        return self.previous_degraded_capacity
     
     def get_current_capacity(self):
         return self.current_capacity
