@@ -4,16 +4,23 @@ from copy import deepcopy
 from Logic import logic_actions
 
 # Definge get price function   
-def get_price(demand, spot_price, percentage_cut):
+def get_price(surplus, spot_price, percentage_cut):
 
     #Sell
-    if demand > 0:
-        return -demand * spot_price*percentage_cut #Price zone DK1
+    if surplus > 0:
+        return -surplus * spot_price*percentage_cut #Price zone DK1
     #Buy
     else:
-        return -demand * spot_price #Price zone DK1
+        return -surplus * spot_price #Price zone DK1
 
 def get_emissions(surplus, degrade, emission):
+    
+    surplus_d = surplus-degrade
+    if surplus_d>0:
+        return 0
+    else:
+        return -surplus_d*emission
+    
     
     return (abs(surplus)+degrade)*emission
 
