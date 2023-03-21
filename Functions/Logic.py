@@ -11,21 +11,6 @@ def logic_bat(row, battery, actions=None): #actions only used for DP
     row["buy"] = 0.0
     return row
 
-# DP logic (mostly to compare to the other logic based models)
-def logic_DP(row, battery, actions):
-    power_yield = row["power_yield"]
-    charge = actions.loc[row.name]["charge"]
-    buy = actions.loc[row.name]["buy"]
-    battery.charge(charge)
-    
-    row["capacity_before"] = battery.get_previous_capacity()
-    row["capacity_degraded"] = battery.get_previous_degraded_capacity()
-    row["capacity_after"] = battery.get_current_capacity()
-    row["surplus"] = power_yield-charge
-    row["charge"] = charge
-    row["buy"] = buy
-    return row
-
 def logic_actions(row, battery, actions):
     power_yield = row["power_yield"]
     charge = actions.loc[row.name]["charge"]

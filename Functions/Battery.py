@@ -19,7 +19,7 @@ class Battery():
             warnings.warn(f"max_charge must be less than or equal to max_capcity! Setting max_charge = {self.max_capacity}")
             self.max_charge = self.max_capacity
 
-    def charge(self, amount, degrade=True):
+    def charge(self, amount, degrade=False):
         self.previous_capacity = self.current_capacity
         
         #Degrade battery by 1 hour

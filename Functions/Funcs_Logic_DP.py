@@ -13,23 +13,19 @@ def get_price(surplus, spot_price, percentage_cut):
     else:
         return -surplus * spot_price #Price zone DK1
 
-def get_emissions(surplus, degrade, emission):
+def get_emissions(surplus, emission):
     
-    surplus_d = surplus-degrade
-    if surplus_d>0:
+    if surplus>0:
         return 0
     else:
-        return -surplus_d*emission
-    
-    
-    return (abs(surplus)+degrade)*emission
+        return -surplus*emission
 
 #Logic functions
 def logic_rollout(series_battery, battery, logic, actions=None):
     
     series_battery = series_battery.apply(lambda row: logic(row, battery, actions), axis=1)
     series_battery["cost"] = series_battery.apply(lambda row: get_price(row["surplus"], row["SpotPriceDKK"]/1000,0.1), axis=1)
-    series_battery["emission"] = series_battery.apply(lambda row: get_emissions(row["surplus"],(row["capacity_before"]-row["capacity_degraded"]),row["CO2Emission"]/1000), axis=1)
+    series_battery["emission"] = series_battery.apply(lambda row: get_emissions(row["surplus"],row["CO2Emission"]/1000), axis=1)
     series_battery["cost_cummulative"] = series_battery["cost"].cumsum(axis=0)
     series_battery["emission_cummulative"] = series_battery["emission"].cumsum(axis=0)
     return series_battery
@@ -38,7 +34,7 @@ def action_rollout(series_battery, battery, actions):
     
     series_battery = series_battery.apply(lambda row: logic_actions(row,battery,actions), axis=1)
     series_battery["cost"] = series_battery.apply(lambda row: get_price(row["surplus"], row["SpotPriceDKK"]/1000,0.1), axis=1)
-    series_battery["emission"] = series_battery.apply(lambda row: get_emissions(row["surplus"],(row["capacity_before"]-row["capacity_degraded"]),row["CO2Emission"]/1000), axis=1)
+    series_battery["emission"] = series_battery.apply(lambda row: get_emissions(row["surplus"],row["CO2Emission"]/1000), axis=1)
     series_battery["cost_cummulative"] = series_battery["cost"].cumsum(axis=0)
     series_battery["emission_cummulative"] = series_battery["emission"].cumsum(axis=0)
     return series_battery
@@ -126,7 +122,7 @@ def policy_rollout(model, pi, x0):
         actions.append(u) # update the list of the actions
     
     J += model.gN(x)
-    actions = pd.DataFrame(actions,columns=['charge','buy'])
+    actions = pd.DataFrame(actions,columns=['charge'])
     actions.index = pd.date_range(start=model.Start, end=model.End, freq="h")
     return J, trajectory, actions
 
