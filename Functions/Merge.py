@@ -54,14 +54,14 @@ def merge(house=None):
     production = df.loc[:"2022-12-31 23:00:00"]["prod_"+house]  
     consumption = df.loc[:"2022-12-31 23:00:00"]["cons_"+house] 
     merged = pd.merge(production, consumption, how="outer", left_index=True,right_index=True)
-    merged["power_yield"] = merged["prod_"+house] - merged["cons_"+house]
+    merged["yield"] = merged["prod_"+house] - merged["cons_"+house]
     
-    values = merged["power_yield"].to_numpy()
+    values = merged["yield"].to_numpy()
     
     for i in range(len(values)):
         values[i] = f"{values[i]:.1f}"
     
-    merged["power_yield"] = values
+    merged["yield"] = values
     
     merged = pd.merge(merged, el_dk1, how="outer", left_index=True,right_index=True)
     merged = pd.merge(merged, em_dk1, how="outer", left_index=True,right_index=True)

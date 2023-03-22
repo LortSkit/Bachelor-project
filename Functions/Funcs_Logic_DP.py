@@ -81,7 +81,7 @@ def logic_series_print(series_battery):
     for i in range(len(series_battery)):
         spot    = series_battery.iloc[i]['SpotPriceDKK']/1000
         eprice  = series_battery.iloc[i]['CO2Emission']/1000
-        yieldd  = series_battery.iloc[i]['power_yield']
+        yieldd  = series_battery.iloc[i]['yield']
         surplus = series_battery.iloc[i]['surplus']
         buy     = series_battery.iloc[i]['buy']
         charge  = series_battery.iloc[i]['charge']
