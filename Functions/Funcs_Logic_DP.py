@@ -135,7 +135,7 @@ def DP_stochastic(model):
     pi = [{} for _ in range(N)]
     J[N] = {x: model.gN(x) for x in model.S(model.N)}
     for k in range(N-1, -1, -1):
-        print(f"\r{k} ",end="")
+        #print(f"\r{k} ",end="")
         for x in model.S(k): 
             """
             Update pi[k][x] and Jstar[k][x] using the general DP algorithm given in (Her21, Algorithm 1).

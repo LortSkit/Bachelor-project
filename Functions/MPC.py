@@ -2,8 +2,10 @@ import numpy as np
 import pandas as pd
 from gekko import GEKKO
 from Merge import merge
+from copy import deepcopy
+from Funcs_Logic_DP import action_rollout
 
-class MPC:
+class MPCModel:
     def __init__(self, house='h16', sbr_val = 0.1, deg_rate=0.0, num_dec=1,max_charge = 7.0,max_cap = 13.0):
         self.house = house
         self.sbr_val = sbr_val
@@ -117,5 +119,49 @@ class MPC:
     def return_data(self):
         return merge(self.house)
 
+def MPC(Start,End,merged,MPCbat,MPCModel,byday=True):
+    N=len(pd.date_range(start=Start,end=End,freq="h"))
+    series_battery_MPC_price=pd.DataFrame()
+    series_battery_MPC_carb=pd.DataFrame()
+    
+    MPCbat_price = deepcopy(MPCbat)
+    MPCbat_carb = deepcopy(MPCbat)
+
+    num_loops = int(np.ceil(N/24)) if byday else 1
+    remainder = N%24
+    length = 24 if byday else N
+    Start_i=Start
+    for i in range(num_loops):
+        if byday and i == num_loops-1:
+            length = length if remainder == 0 else remainder
+
+        End_i = pd.date_range(start=Start_i,periods=length,freq="h")[-1]
+
+        print(f"Period from {Start_i} to {End_i}")
+
+        actions_price = MPCModel.MPCopt_price(merged, Start_i, End_i, MPCbat_price.get_current_capacity())
+
+        series_battery_MPC_price_i = action_rollout(merged.loc[Start_i:End_i], MPCbat_price, actions_price)
+
+
+        actions_carb = MPCModel.MPCopt_carb(merged, Start_i, End_i, MPCbat_carb.get_current_capacity())
+
+        series_battery_MPC_carb_i = action_rollout(merged.loc[Start_i:End_i], MPCbat_carb, actions_carb)
+
+
+        series_battery_MPC_price = pd.concat([series_battery_MPC_price,series_battery_MPC_price_i])
+        series_battery_MPC_carb  = pd.concat([series_battery_MPC_carb,series_battery_MPC_carb_i])
+
+        Start_i= pd.date_range(start=End_i,periods=2,freq="h")[-1]
+
+
+    series_battery_MPC_price["cost_cummulative"] = series_battery_MPC_price["cost"].cumsum(axis=0)
+    series_battery_MPC_price["emission_cummulative"] = series_battery_MPC_price["emission"].cumsum(axis=0)    
+
+    series_battery_MPC_carb["cost_cummulative"] = series_battery_MPC_carb["cost"].cumsum(axis=0)
+    series_battery_MPC_carb["emission_cummulative"] = series_battery_MPC_carb["emission"].cumsum(axis=0)  
+    
+    return series_battery_MPC_price,series_battery_MPC_carb
+    
 if __name__ == "__main__":
     print("This file is meant to be imported")
