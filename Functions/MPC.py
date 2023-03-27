@@ -12,7 +12,7 @@ class MPC:
         self.max_charge = max_charge
         self.max_cap = max_cap
 
-    def MPCopt(self, df, start_time='2022-06-19 00:00:00', end_time = '2022-06-19 23:00:00',ini_bat_state=0):
+    def MPCopt(self, df, start_time='2022-06-19 00:00:00', end_time = '2022-06-19 23:00:00',ini_bat_state=0,verbose=False):
         n = len(pd.date_range(start_time, end_time,freq='H'))
 
         m = GEKKO()
@@ -41,7 +41,7 @@ class MPC:
         # Solver details
         m.options.IMODE = 3
         m.options.SOLVER = 3
-        m.solve()
+        m.solve(disp=verbose)
 
         of = pd.DataFrame()
         #of['time'] = df['time'].loc[start_time:end_time].to_numpy()
@@ -54,8 +54,9 @@ class MPC:
         #of['price'] = df['SpotPriceDKK'].loc[start_time:end_time].to_numpy()/1000
         #of['costs'] = [-1*p[i][0]*s[i][0] if s[i][0]<0 else -1*p[i][0]*self.sbr_val*s[i][0] for i in range(n)]
         #of['cumm_costs'] = of['costs'].cumsum()
+        of.set_index(df.loc[start_time:end_time].index,inplace=True)
 
-        return of['charge'].round(self.num_dec)
+        return of.round(self.num_dec)
         
     def return_data(self):
         return merge(self.house)

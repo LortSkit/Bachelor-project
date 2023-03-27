@@ -15,10 +15,7 @@ def get_price(surplus, spot_price, percentage_cut):
 
 def get_emissions(surplus, emission):
     
-    if surplus>0:
-        return 0
-    else:
-        return -surplus*emission
+    return -surplus*emission
 
 #Logic functions
 def logic_rollout(series_battery, battery, logic, actions=None):
