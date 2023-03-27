@@ -183,13 +183,18 @@ class MPCModel:
         
         return of.round(self.num_dec)
     
-def MPC(Start,End,merged,MPCbat,MPCModel,byday=True):
-    N=len(pd.date_range(start=Start,end=End,freq="h"))
-    series_battery_MPC_price=pd.DataFrame()
-    series_battery_MPC_carb=pd.DataFrame()
+def _model_choice(model_name,MPCModel):
+    if model_name.lower()[0]=="p":
+        return MPCModel.MPCopt_price
+    elif model_name.lower()[0]=="c":
+        return MPCModel.MPCopt_carb
     
-    MPCbat_price = deepcopy(MPCbat)
-    MPCbat_carb = deepcopy(MPCbat)
+    raise Exception("Input must be either 'price' or 'carbon'!!")
+    
+def _MPC(model_name,Start,End,merged,MPCbat,MPCModel,byday,verbose):
+    model = _model_choice(model_name,MPCModel)
+    N=len(pd.date_range(start=Start,end=End,freq="h"))
+    series_battery_MPC=pd.DataFrame()
 
     num_loops = int(np.ceil(N/24)) if byday else 1
     remainder = N%24
@@ -200,32 +205,30 @@ def MPC(Start,End,merged,MPCbat,MPCModel,byday=True):
             length = length if remainder == 0 else remainder
 
         End_i = pd.date_range(start=Start_i,periods=length,freq="h")[-1]
+        
+        if verbose:
+            print(f"Period from {Start_i} to {End_i}")
 
-        print(f"Period from {Start_i} to {End_i}")
+        actions = model(merged, Start_i, End_i, MPCbat.get_current_capacity())
 
-        actions_price = MPCModel.MPCopt_price(merged, Start_i, End_i, MPCbat_price.get_current_capacity())
+        series_battery_MPC_i = action_rollout(merged.loc[Start_i:End_i], MPCbat, actions)
 
-        series_battery_MPC_price_i = action_rollout(merged.loc[Start_i:End_i], MPCbat_price, actions_price)
-
-
-        actions_carb = MPCModel.MPCopt_carb(merged, Start_i, End_i, MPCbat_carb.get_current_capacity())
-
-        series_battery_MPC_carb_i = action_rollout(merged.loc[Start_i:End_i], MPCbat_carb, actions_carb)
-
-
-        series_battery_MPC_price = pd.concat([series_battery_MPC_price,series_battery_MPC_price_i])
-        series_battery_MPC_carb  = pd.concat([series_battery_MPC_carb,series_battery_MPC_carb_i])
+        
+        series_battery_MPC  = pd.concat([series_battery_MPC,series_battery_MPC_i])
 
         Start_i= pd.date_range(start=End_i,periods=2,freq="h")[-1]
 
 
-    series_battery_MPC_price["cost_cummulative"] = series_battery_MPC_price["cost"].cumsum(axis=0)
-    series_battery_MPC_price["emission_cummulative"] = series_battery_MPC_price["emission"].cumsum(axis=0)    
-
-    series_battery_MPC_carb["cost_cummulative"] = series_battery_MPC_carb["cost"].cumsum(axis=0)
-    series_battery_MPC_carb["emission_cummulative"] = series_battery_MPC_carb["emission"].cumsum(axis=0)  
+    series_battery_MPC["cost_cummulative"] = series_battery_MPC["cost"].cumsum(axis=0)
+    series_battery_MPC["emission_cummulative"] = series_battery_MPC["emission"].cumsum(axis=0)    
     
-    return series_battery_MPC_price,series_battery_MPC_carb
+    return series_battery_MPC
+
+def MPC(Start,End,merged,MPCbat,MPCModel,byday=True,verbose=True):
+    return _MPC("p",Start,End,merged,MPCbat,MPCModel,byday,verbose)
+    
+def MPC_carb(Start,End,merged,MPCbat,MPCModel,byday=True,verbose=True):
+    return _MPC("c",Start,End,merged,MPCbat,MPCModel,byday,verbose)
     
 if __name__ == "__main__":
     print("This file is meant to be imported")

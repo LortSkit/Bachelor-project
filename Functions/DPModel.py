@@ -88,17 +88,22 @@ class DPModel_c(DPModel):
         charge = u[0]
         
         return get_emissions(yieldd-charge,self.ep[k]) 
-        
+
+def _model_choice(model_name):
+    if model_name.lower()[0]=="p":
+        return DPModel
+    elif model_name.lower()[0]=="c":
+        return DPModel_c
     
-def DP(Start,End,house,merged,DPbat,byday=True,ints=False,degrade=False):
+    raise Exception("Input must be either 'price' or 'carbon'!!")
+    
+def _DP(model_name,Start,End,house,merged,DPbat,byday,ints,degrade,verbose):
+    model = _model_choice(model_name)
     N=len(pd.date_range(start=Start,end=End,freq="h"))
     
     DPbat_ints = deepcopy(DPbat)
-    DP_c_bat_ints = deepcopy(DPbat)
-    DP_c_bat = deepcopy(DPbat)
     
     series_battery_DP = pd.DataFrame(columns=merged.columns)
-    series_battery_DP_c = pd.DataFrame(columns=merged.columns)
     
     Start_i = Start
     
@@ -111,51 +116,38 @@ def DP(Start,End,house,merged,DPbat,byday=True,ints=False,degrade=False):
             
         End_i = pd.date_range(start=Start_i,periods=length,freq="h")[-1]
         
-        print(f"Period from {Start_i} to {End_i}")
+        if verbose:
+            print(f"Period from {Start_i} to {End_i}")
 
         if ints:
-            #Price
-            DP_ints = DPModel(Start_i, End_i, house, merged, deepcopy(DPbat_ints),degrade,True)
+            DP_ints = model(Start_i, End_i, house, merged, deepcopy(DPbat_ints),degrade,True)
             _, pi_ints = DP_stochastic(DP_ints)
             _, _, actions_ints = policy_rollout(DP_ints,pi=lambda x, k: pi_ints[k][x],x0=int(DPbat_ints.get_current_capacity()))
             charge_i = list(actions_ints["charge"])
 
-            DP = DPModel(Start_i, End_i, house, merged, deepcopy(DPbat),degrade,False,charge_i,1.5)
-            
-            #Carb
-            DP_c_ints = DPModel_c(Start_i, End_i, house, merged, deepcopy(DP_c_bat_ints),degrade,True)
-            _, pi_ints = DP_stochastic(DP_c_ints)
-            _, _, actions_ints = policy_rollout(DP_c_ints,pi=lambda x, k: pi_ints[k][x],x0=int(DP_c_bat_ints.get_current_capacity()))
-            charge_c_i = list(actions_ints["charge"])
-
-            DP_c = DPModel_c(Start_i, End_i, house, merged, deepcopy(DP_c_bat),degrade,False,charge_c_i,1.5)
+            DP = model(Start_i, End_i, house, merged, deepcopy(DPbat),degrade,False,charge_i,1.5)
 
         else:
-            DP   = DPModel(Start_i, End_i, house, merged,deepcopy(DPbat))
-            DP_c = DPModel_c(Start_i, End_i, house, merged,deepcopy(DP_c_bat))
+            DP   = model(Start_i, End_i, house, merged,deepcopy(DPbat))
         
-        #Price
         _, pi = DP_stochastic(DP)
         _, _, actions = policy_rollout(DP,pi=lambda x, k: pi[k][x],x0=DPbat.get_current_capacity())
         series_battery_DP_i  = action_rollout(merged.loc[Start_i:End_i], DPbat, actions)
 
         series_battery_DP = pd.concat([series_battery_DP,series_battery_DP_i])
         
-        #Carb
-        _, pi = DP_stochastic(DP_c)
-        _, _, actions = policy_rollout(DP_c,pi=lambda x, k: pi[k][x],x0=DP_c_bat.get_current_capacity())
-        series_battery_DP_c_i  = action_rollout(merged.loc[Start_i:End_i], DP_c_bat, actions)
-
-        series_battery_DP_c = pd.concat([series_battery_DP_c,series_battery_DP_c_i])
-        
         Start_i= pd.date_range(start=End_i,periods=2,freq="h")[-1]
 
     series_battery_DP["cost_cummulative"] = series_battery_DP["cost"].cumsum(axis=0)
     series_battery_DP["emission_cummulative"] = series_battery_DP["emission"].cumsum(axis=0) 
-    series_battery_DP_c["cost_cummulative"] = series_battery_DP_c["cost"].cumsum(axis=0)
-    series_battery_DP_c["emission_cummulative"] = series_battery_DP_c["emission"].cumsum(axis=0) 
     
-    return series_battery_DP,series_battery_DP_c
+    return series_battery_DP
+    
+def DP(Start,End,house,merged,DPbat,byday=True,ints=True,degrade=False,verbose=True):
+    return _DP("p",Start,End,house,merged,DPbat,byday,ints,degrade,verbose)
+
+def DP_carb(Start,End,house,merged,DPbat,byday=True,ints=True,degrade=False,verbose=True):
+    return _DP("c",Start,End,house,merged,DPbat,byday,ints,degrade,verbose)
     
 if __name__ == "__main__":
     print("This file is meant to be imported")
