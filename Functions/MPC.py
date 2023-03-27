@@ -4,9 +4,8 @@ from gekko import GEKKO
 from Merge import merge
 
 class MPC:
-    def __init__(self, house='h16', ini_bat_state=0,sbr_val = 0.1, deg_rate=0.0, num_dec=1,max_charge = 7.0,max_cap = 13.0):
+    def __init__(self, house='h16', sbr_val = 0.1, deg_rate=0.0, num_dec=1,max_charge = 7.0,max_cap = 13.0):
         self.house = house
-        self.ini_bat_state = ini_bat_state
         self.sbr_val = sbr_val
         self.deg_rate = deg_rate
         self.num_dec = num_dec
