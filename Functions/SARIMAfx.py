@@ -6,7 +6,7 @@ sys.path.append('C:\\Users\\vidis\\OneDrive\\Desktop\\Spring23\\BachelorProject\
 from Merge import merge
 
 class SARIMA:
-    def __init__(self, house, cons_ts = 500, prod_ts=3000, carb_ts=50):
+    def __init__(self, house, cons_ts = 500, prod_ts=3000, carb_ts=500):
         self.house = house
         self.cons_ts = cons_ts
         self.prod_ts = prod_ts
