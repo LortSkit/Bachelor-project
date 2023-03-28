@@ -47,6 +47,7 @@ class MPCModel:
         m.Obj(cumm_cost)
 
         # Solver details
+        m.options.MAX_ITER = 10000
         m.options.IMODE = 3
         m.options.SOLVER = 3
         m.solve(disp=verbose)
@@ -98,6 +99,7 @@ class MPCModel:
         m.Obj(cumm_cost)
 
         # Solver details
+        m.options.MAX_ITER = 10000
         m.options.IMODE = 3
         m.options.SOLVER = 3
         m.solve(disp=verbose)
@@ -156,6 +158,7 @@ class MPCModel:
         m.Obj((1-ratio)*p_cost+ratio*c_cost)
         
         # Solver details
+        m.options.MAX_ITER = 10000
         m.options.IMODE = 3
         m.options.SOLVER = 3
         m.solve(disp=verbose)
