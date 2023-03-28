@@ -49,8 +49,17 @@ class MPCModel:
         # Solver details
         m.options.MAX_ITER = 10000
         m.options.IMODE = 3
-        m.options.SOLVER = 3
-        m.solve(disp=verbose)
+        solvers = [3,1,2] 
+        for solver in solvers:
+            try:
+                print(f'Trying solver {solver}')
+                m.options.SOLVER = solver
+                m.solve(disp=verbose)
+                break 
+            except Exception as e:
+                print(f"Solver {solver} failed with error: {e}")
+        else:
+            print("All solvers failed")
 
         of = pd.DataFrame()
         of['time'] = df.loc[start_time:end_time].index
@@ -101,8 +110,17 @@ class MPCModel:
         # Solver details
         m.options.MAX_ITER = 10000
         m.options.IMODE = 3
-        m.options.SOLVER = 3
-        m.solve(disp=verbose)
+        solvers = [3,1,2] 
+        for solver in solvers:
+            try:
+                print(f'Trying solver {solver}')
+                m.options.SOLVER = solver
+                m.solve(disp=verbose)
+                break 
+            except Exception as e:
+                print(f"Solver {solver} failed with error: {e}")
+        else:
+            print("All solvers failed")
 
         of = pd.DataFrame()
         of['time'] = df.loc[start_time:end_time].index
@@ -160,11 +178,17 @@ class MPCModel:
         # Solver details
         m.options.MAX_ITER = 10000
         m.options.IMODE = 3
-        m.options.SOLVER = 3
-        m.solve(disp=verbose)
-        
-        #print([p[i] for i in range(n)])
-        #print([c[i] for i in range(n)])
+        solvers = [3,1,2] 
+        for solver in solvers:
+            try:
+                print(f'Trying solver {solver}')
+                m.options.SOLVER = solver
+                m.solve(disp=verbose)
+                break 
+            except Exception as e:
+                print(f"Solver {solver} failed with error: {e}")
+        else:
+            print("All solvers failed")
         
         of = pd.DataFrame()
         of['time'] = df.loc[start_time:end_time].index
