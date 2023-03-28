@@ -191,10 +191,12 @@ def _model_choice(model_name,MPCModel):
         return MPCModel.MPCopt_price
     elif model_name.lower()[0]=="c":
         return MPCModel.MPCopt_carb
+    elif model_name.lower()[0]=="b":
+        return MPCModel.MPCopt_
     
-    raise Exception("Input must be either 'price' or 'carbon'!!")
+    raise Exception("Input must be either 'price', 'carbon', or 'both'!!")
     
-def _MPC(model_name,Start,End,merged,MPCbat,MPCModel,byday,verbose):
+def _MPC(model_name,Start,End,merged,MPCbat,MPCModel,byday,verbose,ratio):
     model = _model_choice(model_name,MPCModel)
     N=len(pd.date_range(start=Start,end=End,freq="h"))
     series_battery_MPC=pd.DataFrame()
@@ -212,7 +214,10 @@ def _MPC(model_name,Start,End,merged,MPCbat,MPCModel,byday,verbose):
         if verbose:
             print(f"Period from {Start_i} to {End_i}")
 
-        actions = model(merged, Start_i, End_i, MPCbat.get_current_capacity())
+        if model_name.lower()[0]!="b":
+            actions = model(merged, Start_i, End_i, MPCbat.get_current_capacity(),False)
+        else:
+            actions = model(merged, Start_i, End_i, MPCbat.get_current_capacity(),False,ratio)
 
         series_battery_MPC_i = action_rollout(merged.loc[Start_i:End_i], MPCbat, actions)
 
@@ -228,10 +233,13 @@ def _MPC(model_name,Start,End,merged,MPCbat,MPCModel,byday,verbose):
     return series_battery_MPC
 
 def MPC(Start,End,merged,MPCbat,MPCModel,byday=True,verbose=True):
-    return _MPC("p",Start,End,merged,MPCbat,MPCModel,byday,verbose)
+    return _MPC("p",Start,End,merged,MPCbat,MPCModel,byday,verbose,None)
     
 def MPC_carb(Start,End,merged,MPCbat,MPCModel,byday=True,verbose=True):
-    return _MPC("c",Start,End,merged,MPCbat,MPCModel,byday,verbose)
+    return _MPC("c",Start,End,merged,MPCbat,MPCModel,byday,verbose,None)
+
+def MPC_price_carb(Start,End,merged,MPCbat,MPCModel,ratio=0.5,byday=True,verbose=True):
+    return _MPC("b",Start,End,merged,MPCbat,MPCModel,byday,verbose,ratio)
     
 if __name__ == "__main__":
     print("This file is meant to be imported")
