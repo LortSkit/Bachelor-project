@@ -1,8 +1,6 @@
 import numpy as np
 import pandas as pd
 from pmdarima.arima import auto_arima
-import sys
-sys.path.append('C:\\Users\\vidis\\OneDrive\\Desktop\\Spring23\\BachelorProject\\Bachelor-project\\Functions')
 from Merge import merge
 
 class SARIMA:
