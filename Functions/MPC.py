@@ -52,12 +52,14 @@ class MPCModel:
         solvers = [3,1,2] 
         for solver in solvers:
             try:
-                print(f'Trying solver {solver}')
+                if verbose:
+                    print(f'Trying solver {solver}')
                 m.options.SOLVER = solver
                 m.solve(disp=verbose)
                 break 
             except Exception as e:
-                print(f"Solver {solver} failed with error: {e}")
+                if verbose:
+                    print(f"Solver {solver} failed with error: {e}")
         else:
             print("All solvers failed")
 
@@ -113,12 +115,14 @@ class MPCModel:
         solvers = [3,1,2] 
         for solver in solvers:
             try:
-                print(f'Trying solver {solver}')
+                if verbose:
+                    print(f'Trying solver {solver}')
                 m.options.SOLVER = solver
                 m.solve(disp=verbose)
                 break 
             except Exception as e:
-                print(f"Solver {solver} failed with error: {e}")
+                if verbose:
+                    print(f"Solver {solver} failed with error: {e}")
         else:
             print("All solvers failed")
 
@@ -181,12 +185,14 @@ class MPCModel:
         solvers = [3,1,2] 
         for solver in solvers:
             try:
-                print(f'Trying solver {solver}')
+                if verbose:
+                    print(f'Trying solver {solver}')
                 m.options.SOLVER = solver
                 m.solve(disp=verbose)
                 break 
             except Exception as e:
-                print(f"Solver {solver} failed with error: {e}")
+                if verbose:
+                    print(f"Solver {solver} failed with error: {e}")
         else:
             print("All solvers failed")
         

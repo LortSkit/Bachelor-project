@@ -65,7 +65,8 @@ def merge(house=None):
     
     merged = pd.merge(merged, el_dk1, how="outer", left_index=True,right_index=True)
     merged = pd.merge(merged, em_dk1, how="outer", left_index=True,right_index=True)
-    merged = merged
+    merged = merged.loc[~merged.index.duplicated(), :]
+    merged = merged.asfreq('H').loc["2020-12-22 00:00:00":"2022-12-31 23:00:00"]
     return merged
 
 if __name__ == "__main__":

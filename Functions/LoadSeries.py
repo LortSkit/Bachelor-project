@@ -1,4 +1,5 @@
 import pandas as pd
+from Merge import merge
 
 def load_series(datatype=None,house=None,rename=None, shifts=None):
     '''
@@ -6,7 +7,7 @@ def load_series(datatype=None,house=None,rename=None, shifts=None):
     
     datatype: str, specifies whether the production or consumption values are selected
               
-              "Production", "Consumption", "P", "C", "prod", "cons", etc.
+              "Production", "Consumption", "Emissions", "P", "C", "E", "prod", "cons", "emis" etc.
     
     
     house: str, specifies which house is selected 
@@ -28,11 +29,13 @@ def load_series(datatype=None,house=None,rename=None, shifts=None):
         datatypeStr = "prod_"
     elif datatype[0].lower()=="c":
         datatypeStr = "cons_"
+    elif datatype[0].lower()=="e":
+        datatypeStr = "carb_"
     
     #Making sure an existing house is chosen
-    if house is None:
+    if house is None and datatypeStr != "carb_":
         raise Exception("Second input must specify house: k28, h16, h22, h28, or h32")
-    elif house.lower() not in ["k28","h16","h22","h28","h32"]:
+    elif datatypeStr != "carb_" and house.lower() not in ["k28","h16","h22","h28","h32"]:
         raise Exception("Second input must specify house: k28, h16, h22, h28, or h32")
     
     #Production or consumption is chosen and loaded
@@ -42,12 +45,27 @@ def load_series(datatype=None,house=None,rename=None, shifts=None):
         res["Time"] = pd.to_datetime(res["Time"], utc=True)
         res = res.set_index("Time").sort_index()
         res.index = pd.date_range(start=res.index.tz_convert(None)[0], end=res.index.tz_convert(None)[-1], freq="h")
-    else:
+        res = res.loc["2020-12-22 00:00:00":"2022-12-31 23:00:00"]
+    elif datatypeStr=="cons_":
         res = pd.read_csv("cf_filled.csv",sep=",")
         res = res[["Time",datatypeStr+house]]
         res["Time"] = pd.to_datetime(res["Time"], utc=True)
         res = res.set_index("Time").sort_index()
         res.index = pd.date_range(start=res.index.tz_convert(None)[0], end=res.index.tz_convert(None)[-1], freq="h")
+        res = res.loc["2020-12-22 00:00:00":"2022-12-31 23:00:00"]
+    else:
+        merged=merge("h16").loc["2020-12-22 00:00:00":"2022-12-31 23:00:00"] #placeholder house
+        res = pd.DataFrame()
+        if rename is not None:
+            res[rename] = merged["CO2Emission"]
+            carb_name = rename
+        else:
+            res["CO2Emission"] = merged["CO2Emission"] 
+            carb_name = "CO2Emission"
+        res["Time"] = merged.index
+        res = res[["Time",carb_name]]
+        res = res.set_index("Time").sort_index()
+        res.index = pd.date_range(start=res.index[0], end=res.index[-1], freq="h")
     
     #Renaming value column
     if not house is None and not rename is None:
