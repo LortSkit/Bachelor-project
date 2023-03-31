@@ -3,22 +3,35 @@ from Merge import merge
 
 def load_series(datatype=None,house=None,rename=None, shifts=None):
     '''
-    Loading data series from cf_filled (consumption) or pf_filled (production)
+    Dataframe of either production, consumption or emissions values, along with its
+    lagged features (shifts), as well as the features year, month, day, weekday, and
+    hour, for the house specified.
+    
+    Usage: Feature matrix for when predicting using Random Forest, plotting purposes
+    
+    
+    Input:
     
     datatype: str, specifies whether the production or consumption values are selected
               
-              "Production", "Consumption", "Emissions", "P", "C", "E", "prod", "cons", "emis" etc.
+              "Production", "Consumption", "Emissions", "P", "C", "E", "prod", "cons", 
+              "emis" etc.
     
-    
-    house: str, specifies which house is selected 
+    house: str, specifies which house is selected (Required if datatype is not Emissions)
            
            "k28", "h16", "h22", "h28", or "h32"
          
-    rename: str, renames chosen column. 
+    rename: str, renames chosen column. (Optional)
             
-            If the whole file is returned, this parameter is ignored
+            "val" will rename the data type string and any shift names will start with 
+            "val". If None, shift names will start with 't'.
             
     shifts: list of int, if given, specifies what shifted columns to add
+            
+            For report we use shifts = [24, 48, 168]
+           
+           
+    Example: train_series = load_series("p","h16","val", [24,48,168])
     '''
     res = None
     #Production or consumption string stuff
@@ -38,7 +51,7 @@ def load_series(datatype=None,house=None,rename=None, shifts=None):
     elif datatypeStr != "carb_" and house.lower() not in ["k28","h16","h22","h28","h32"]:
         raise Exception("Second input must specify house: k28, h16, h22, h28, or h32")
     
-    #Production or consumption is chosen and loaded
+    #Production, consumption or emissions is chosen and loaded
     if datatypeStr=="prod_":
         res = pd.read_csv("pf_filled.csv",sep=",")
         res = res[["Time",datatypeStr+house]]
@@ -54,7 +67,7 @@ def load_series(datatype=None,house=None,rename=None, shifts=None):
         res.index = pd.date_range(start=res.index.tz_convert(None)[0], end=res.index.tz_convert(None)[-1], freq="h")
         res = res.loc["2020-12-22 00:00:00":"2022-12-31 23:00:00"]
     else:
-        merged=merge("h16").loc["2020-12-22 00:00:00":"2022-12-31 23:00:00"] #placeholder house
+        merged=merge("h16").loc["2020-12-22 00:00:00":"2022-12-31 23:00:00"] #placeholder house: use merge to get emissions
         res = pd.DataFrame()
         if rename is not None:
             res[rename] = merged["CO2Emission"]
@@ -71,7 +84,7 @@ def load_series(datatype=None,house=None,rename=None, shifts=None):
     if not house is None and not rename is None:
         res = res.rename(columns={datatypeStr+house: rename}, errors="raise")
     
-    #Shifted columns added
+    #Shifted columns added: lagged features
     if not shifts is None:
         if rename is None:
             shiftname = 't'
@@ -83,7 +96,7 @@ def load_series(datatype=None,house=None,rename=None, shifts=None):
         res = pd.concat([res, dataframe], axis=1)
         res.dropna(inplace=True)
     
-    #Nice stuff for indexing
+    #Time features
     res['Year']=res.index.year
     res['Month']=res.index.month
     res['Day']=res.index.day
@@ -92,6 +105,12 @@ def load_series(datatype=None,house=None,rename=None, shifts=None):
     return res
 
 def moving_average(timeseries, window):
+    '''
+    Used to  smoothen timeseries for plotting purposes
+    
+    
+    Example: moving_average(df['val'], 3).plot(ax=ax, label='val', color='blue')
+    '''
     return timeseries.rolling(window=window, center=True).mean()
 
 if __name__ == "__main__":
