@@ -1,24 +1,93 @@
 import pandas as pd
 from dateutil.relativedelta import relativedelta
 from copy import deepcopy
-from Logic import logic_actions
+from Logic import logic_actions, logic_bat
 
-# Definge get price function   
 def get_price(surplus, spot_price, percentage_cut):
-
+    '''
+    (Description)
+    
+    Usage: (Explanation)
+    
+    
+    Input:
+    
+    surplus: (type), (Explanation)
+             
+             (Explanation)
+    
+    spot_price: (type), (Explanation)
+             
+                (Explanation)
+                
+    percentage_cut: (type), (Explanation)
+             
+                    (Explanation)
+                    
+    
+    Example: get_price(-5.5, 0.154039, 0.1) = 0.8472145
+    '''
+    
     #Sell
     if surplus > 0:
-        return -surplus * spot_price*percentage_cut #Price zone DK1
+        return -surplus * spot_price*percentage_cut
     #Buy
     else:
-        return -surplus * spot_price #Price zone DK1
+        return -surplus * spot_price
 
+    
 def get_emissions(surplus, emission):
+    '''
+    (Description)
+    
+    Usage: (Explanation)
+    
+    
+    Input:
+    
+    surplus: (type), (Explanation)
+             
+             (Explanation)
+    
+    emission: (type), (Explanation)
+             
+              (Explanation)
+                    
+    
+    Example: get_emissions(-5.5, 0.1370) = 0.7535
+    '''
     
     return -surplus*emission
 
-#Logic functions
+
 def logic_rollout(series_battery, battery, logic, actions=None):
+    '''
+    (Description)
+    
+    Usage: (Explanation)
+    
+    
+    Input:
+    
+    series_battery: (type), (Explanation)
+             
+                    (Explanation)
+    
+    battery: (type), (Explanation)
+             
+             (Explanation)
+             
+    logic: (type), (Explanation)
+             
+           (Explanation)
+             
+    actions: (type), (Explanation)
+             
+             (Explanation)
+             
+    
+    Example: logic_rollout(merged.loc[Start:End], Battery(max_capacity=13), logic_bat)
+    '''
     
     series_battery = series_battery.apply(lambda row: logic(row, battery, actions), axis=1)
     series_battery["cost"] = series_battery.apply(lambda row: get_price(row["surplus"], row["SpotPriceDKK"]/1000,0.1), axis=1)
@@ -28,23 +97,85 @@ def logic_rollout(series_battery, battery, logic, actions=None):
     return series_battery
 
 def action_rollout(series_battery, battery, actions):
+    '''
+    (Description)
     
-    series_battery = series_battery.apply(lambda row: logic_actions(row,battery,actions), axis=1)
-    series_battery["cost"] = series_battery.apply(lambda row: get_price(row["surplus"], row["SpotPriceDKK"]/1000,0.1), axis=1)
-    series_battery["emission"] = series_battery.apply(lambda row: get_emissions(row["surplus"],row["CO2Emission"]/1000), axis=1)
-    series_battery["cost_cummulative"] = series_battery["cost"].cumsum(axis=0)
-    series_battery["emission_cummulative"] = series_battery["emission"].cumsum(axis=0)
-    return series_battery
+    Usage: (Explanation)
+    
+    
+    Input:
+    
+    series_battery: (type), (Explanation)
+             
+                    (Explanation)
+    
+    battery: (type), (Explanation)
+             
+             (Explanation)
+             
+    actions: (type), (Explanation)
+             
+             (Explanation)
+             
+    
+    Example: action_rollout(merged_i.iloc[:length], Battery(max_capacity=13), actions[:length])
+    '''
+    return logic_rollout(series_battery, battery, logic_actions, actions)
     
 
-def pred_logic_rollout(series_battery_true,series_battery_pred, battery, logic, actions=None):
+def pred_logic_rollout(series_battery_true,series_battery_pred, battery, logic):
+    '''
+    (Description)
     
-    series_battery_pred = logic_rollout(series_battery_pred, deepcopy(battery), logic, actions)
+    Usage: (Explanation)
+    
+    
+    Input:
+    
+    series_battery_true: (type), (Explanation)
+             
+                         (Explanation)
+    
+    series_battery_pred: (type), (Explanation)
+             
+                         (Explanation)
+    
+    battery: (type), (Explanation)
+             
+             (Explanation)
+             
+    logic: (type), (Explanation) REDACTED, NOT IN USE
+             
+           (Explanation)
+             
+    
+    Example: pred_logic_rollout(merged_i, pred_i, Battery(max_capacity=13), logic_bat)
+    '''
+    
+    series_battery_pred = logic_rollout(series_battery_pred, deepcopy(battery), logic_bat, None)
     
     series_battery_true = action_rollout(series_battery_true, battery, series_battery_pred)
+    
     return series_battery_true
     
+    
 def print_price_summary(series_battery,yearprint=True):
+    '''
+    (Description)
+    
+    Usage: (Explanation)
+    
+    
+    Input:
+    
+    series_battery: (type), (Explanation)
+             
+                    (Explanation)
+             
+    
+    Example: print_price_summary(logic_rollout(merged.loc[Start:End], Battery(max_capacity=13), logic_bat))
+    '''
+    
     start, end = series_battery.index[0], series_battery.index[-1]
     difference_in_years = relativedelta(end, start).years
     print(f"The period is from {start} to {end}")
@@ -71,8 +202,24 @@ def print_price_summary(series_battery,yearprint=True):
 
     return round(series_battery['cost'].sum()/years_timedelta,0),-num_wh_total/years_timedelta, num_wh_total_sold/years_timedelta
 
-#Prints the all action sequences (along with other goodies) using the series_battery attained from logic_rollout
+
 def logic_series_print(series_battery):
+    '''
+    (Description)
+    
+    Usage: (Explanation)
+    
+    
+    Input:
+    
+    series_battery: (type), (Explanation)
+             
+                    (Explanation)
+             
+    
+    Example: logic_series_print(logic_rollout(merged.loc[Start:End], Battery(max_capacity=13), logic_bat))
+    '''
+    
     print(f"{'hour':8s} {'price':8s} {'eprice':8s} {'yield':8s} {'surplus':8s} {'buy':8s} {'charge':8s} {'before':8s} {'degrade':8s} {'after':8s} {'cost':8s} {'pcumsum':8s} {'emis':8s} {'ecumsum':8s}")
 
     for i in range(len(series_battery)):
@@ -92,7 +239,6 @@ def logic_series_print(series_battery):
         print(f"{i:5d}: {spot:8.4f},{eprice:8.4f},{yieldd:8.4f},{surplus:8.4f},{buy:8.4f},{charge:8.4f},{before:8.4f},{degrade:8.4f},{after:8.4f},{cost:8.4f},{cost_c:8.4f},{emis:8.4f},{emis_c:8.4f}")
         
         
-#DP functions
 def policy_rollout(model, pi, x0):
     """
     Given an environment and policy, should compute one rollout of the policy and compute
@@ -122,6 +268,7 @@ def policy_rollout(model, pi, x0):
     actions = pd.DataFrame(actions,columns=['charge'])
     actions.index = pd.date_range(start=model.Start, end=model.End, freq="h")
     return J, trajectory, actions
+
 
 def DP_stochastic(model):
     """
