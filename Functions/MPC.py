@@ -81,6 +81,13 @@ class MPCModel:
         of.set_index(of['time'],inplace=True)
         of.drop(['time'],axis=1,inplace=True)
 
+        #Proper rounding of charge to one decimal
+        values = of["charge"].to_numpy()
+        for i in range(len(values)):
+            values[i] = f"{values[i]:.1f}"
+
+        of["charge"] = values
+        
         return of
     
     def MPCopt_carb(self, df, start_time='2022-06-19 00:00:00', end_time = '2022-06-19 23:00:00',ini_bat_state=0,verbose=False):
@@ -143,6 +150,13 @@ class MPCModel:
 
         of.set_index(of['time'],inplace=True)
         of.drop(['time'],axis=1,inplace=True)
+        
+        #Proper rounding of charge to one decimal
+        values = of["charge"].to_numpy()
+        for i in range(len(values)):
+            values[i] = f"{values[i]:.1f}"
+
+        of["charge"] = values
         
         return of
     
@@ -214,6 +228,13 @@ class MPCModel:
         of.set_index(of['time'],inplace=True)
         of.drop(['time'],axis=1,inplace=True)
         
+        #Proper rounding of charge to one decimal
+        values = of["charge"].to_numpy()
+        for i in range(len(values)):
+            values[i] = f"{values[i]:.1f}"
+
+        of["charge"] = values
+        
         return of
     
 def _model_choice(model_name,MPCModel):
@@ -268,7 +289,7 @@ def MPC(Start,End,merged,MPCbat,MPCModel,byday=True,verbose=True):
 def MPC_carb(Start,End,merged,MPCbat,MPCModel,byday=True,verbose=True):
     return _MPC("c",Start,End,merged,MPCbat,MPCModel,byday,verbose,None)
 
-def MPC_price_carb(Start,End,merged,MPCbat,MPCModel,ratio=0.5,byday=True,verbose=True):
+def MPC_both(Start,End,merged,MPCbat,MPCModel,ratio=0.5,byday=True,verbose=True):
     return _MPC("b",Start,End,merged,MPCbat,MPCModel,byday,verbose,ratio)
     
 if __name__ == "__main__":
