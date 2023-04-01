@@ -37,7 +37,7 @@ def load_series(datatype=None,house=None,rename=None, shifts=None):
     #Production or consumption string stuff
     datatypeStr = ""
     if datatype is None:
-        raise Exception("First input must specify either Production or Consumption")
+        raise Exception("First input must specify either Production or Consumption, or Emissions")
     elif datatype[0].lower()=="p":
         datatypeStr = "prod_"
     elif datatype[0].lower()=="c":
@@ -81,7 +81,7 @@ def load_series(datatype=None,house=None,rename=None, shifts=None):
         res.index = pd.date_range(start=res.index[0], end=res.index[-1], freq="h")
     
     #Renaming value column
-    if not house is None and not rename is None:
+    if not house is None and not rename is None and datatypeStr!="carb_":
         res = res.rename(columns={datatypeStr+house: rename}, errors="raise")
     
     #Shifted columns added: lagged features
