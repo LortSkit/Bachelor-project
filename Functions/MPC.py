@@ -81,7 +81,7 @@ class MPCModel:
         of.set_index(of['time'],inplace=True)
         of.drop(['time'],axis=1,inplace=True)
 
-        return of.round(self.num_dec)
+        return of
     
     def MPCopt_carb(self, df, start_time='2022-06-19 00:00:00', end_time = '2022-06-19 23:00:00',ini_bat_state=0,verbose=False):
         n = len(pd.date_range(start_time, end_time,freq='H'))
@@ -144,7 +144,7 @@ class MPCModel:
         of.set_index(of['time'],inplace=True)
         of.drop(['time'],axis=1,inplace=True)
         
-        return of.round(self.num_dec)
+        return of
     
     def MPCopt_(self, df, start_time='2022-06-19 00:00:00', end_time = '2022-06-19 23:00:00',ini_bat_state=0,verbose=False,ratio=0.5):
         n = len(pd.date_range(start_time, end_time,freq='H'))
@@ -214,7 +214,7 @@ class MPCModel:
         of.set_index(of['time'],inplace=True)
         of.drop(['time'],axis=1,inplace=True)
         
-        return of.round(self.num_dec)
+        return of
     
 def _model_choice(model_name,MPCModel):
     if model_name.lower()[0]=="p":
