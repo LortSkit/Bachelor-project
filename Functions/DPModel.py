@@ -89,15 +89,34 @@ class DPModel_c(DPModel):
         
         return get_emissions(yieldd-charge,self.ep[k]) 
 
+class DPModel_both(DPModel_c):
+    def __init__(self, Start, End, house, merged, battery,degrade=False,ints=False,acts=None,acts_range=None,ratio=0.5): 
+        super().__init__(Start, End, house, merged, battery,degrade,ints,acts,acts_range)
+        self.ratio = ratio
+        self.sp = self.norm(self.sp)
+        self.ep = self.norm(self.ep)
+    
+    def norm(self,x):
+        return (x-np.min(x))/(np.max(x)-np.min(x))
+    
+    def g(self, x, u, w, k):
+        yieldd = self.get_yield(k)
+        charge = u[0]
+        
+        return (1-self.ratio)*get_price(yieldd-charge,self.sp[k],0.1)+self.ratio*get_emissions(yieldd-charge,self.ep[k]) 
+    
+
 def _model_choice(model_name):
     if model_name.lower()[0]=="p":
         return DPModel
     elif model_name.lower()[0]=="c":
         return DPModel_c
+    elif model_name.lower()[0]=="b":
+        return DPModel_both
     
-    raise Exception("Input must be either 'price' or 'carbon'!!")
+    raise Exception("Input must be either 'price', 'carbon', or 'both'!!")
     
-def _DP(model_name,Start,End,house,merged,DPbat,byday,ints,degrade,verbose):
+def _DP(model_name,Start,End,house,merged,DPbat,byday,ints,degrade,verbose,ratio):
     model = _model_choice(model_name)
     N=len(pd.date_range(start=Start,end=End,freq="h"))
     
@@ -120,15 +139,24 @@ def _DP(model_name,Start,End,house,merged,DPbat,byday,ints,degrade,verbose):
             print(f"Period from {Start_i} to {End_i}")
 
         if ints:
-            DP_ints = model(Start_i, End_i, house, merged, deepcopy(DPbat_ints),degrade,True)
+            if model_name.lower()[0]!="b":
+                DP_ints = model(Start_i, End_i, house, merged, deepcopy(DPbat_ints),degrade=degrade,ints=True)
+            else:
+                DP_ints = model(Start_i, End_i, house, merged, deepcopy(DPbat_ints),degrade=degrade,ints=True,ratio=ratio)
             _, pi_ints = DP_stochastic(DP_ints)
             _, _, actions_ints = policy_rollout(DP_ints,pi=lambda x, k: pi_ints[k][x],x0=int(DPbat_ints.get_current_capacity()))
             charge_i = list(actions_ints["charge"])
-
-            DP = model(Start_i, End_i, house, merged, deepcopy(DPbat),degrade,False,charge_i,1.5)
+            
+            if model_name.lower()[0]!="b":
+                DP = model(Start_i, End_i, house, merged, deepcopy(DPbat), degrade=degrade, acts=charge_i, acts_range=1.5)
+            else:
+                DP = model(Start_i, End_i, house, merged, deepcopy(DPbat), degrade=degrade, acts=charge_i, acts_range=1.5, ratio=ratio)
 
         else:
-            DP   = model(Start_i, End_i, house, merged,deepcopy(DPbat))
+            if model_name.lower()[0]!="b":
+                DP = model(Start_i, End_i, house, merged,deepcopy(DPbat), degrade=degrade)
+            else:
+                DP = model(Start_i, End_i, house, merged,deepcopy(DPbat), degrade=degrade, ratio=ratio)
         
         _, pi = DP_stochastic(DP)
         _, _, actions = policy_rollout(DP,pi=lambda x, k: pi[k][x],x0=DPbat.get_current_capacity())
@@ -144,10 +172,13 @@ def _DP(model_name,Start,End,house,merged,DPbat,byday,ints,degrade,verbose):
     return series_battery_DP
     
 def DP(Start,End,house,merged,DPbat,byday=True,ints=True,degrade=False,verbose=True):
-    return _DP("p",Start,End,house,merged,DPbat,byday,ints,degrade,verbose)
+    return _DP("p",Start,End,house,merged,DPbat,byday,ints,degrade,verbose,None)
 
 def DP_carb(Start,End,house,merged,DPbat,byday=True,ints=True,degrade=False,verbose=True):
-    return _DP("c",Start,End,house,merged,DPbat,byday,ints,degrade,verbose)
+    return _DP("c",Start,End,house,merged,DPbat,byday,ints,degrade,verbose,None)
+
+def DP_both(Start,End,house,merged,DPbat,byday=True,ints=True,degrade=False,verbose=True,ratio=0.5):
+    return _DP("b",Start,End,house,merged,DPbat,byday,ints,degrade,verbose,ratio)
     
 if __name__ == "__main__":
     print("This file is meant to be imported")
