@@ -4,7 +4,7 @@ from pmdarima.arima import auto_arima
 from Merge import merge
 
 class SARIMA:
-    def __init__(self, house, cons_ts = 500, prod_ts=3000, carb_ts=500):
+    def __init__(self, house, cons_ts = 100, prod_ts=100, carb_ts=100):
         self.house = house
         self.cons_ts = cons_ts
         self.prod_ts = prod_ts
@@ -32,11 +32,10 @@ class SARIMA:
         arima_model = auto_arima(train, start_p=0, start_d=0, start_q=0, 
                         max_p = 5, max_d=5, max_q=5, start_P=0,
                         start_D=0, start_Q=0, m=24, seasonal=True, 
-                        error_action='warn', trace=True, supress_warning=True,
+                        error_action='warn', trace=False, supress_warning=True,
                         stepwise=True, random_state=20, n_fits=50)
         
         pred = arima_model.predict(n_periods=n)    
-        rmse = np.sqrt(mean_squared_error(test,pred))
         
         tf = pd.DataFrame(columns=['test','pred'])
         tf['test'] = test
@@ -44,8 +43,14 @@ class SARIMA:
         return tf
     
     def SARIMA(self, start_time, end_time):
+        print("\r                                             ",end="")
+        print("\rOptimizing production",end="")
         pf = self.model(start_time, end_time, 'prod')
+        print("\r                                             ",end="")
+        print("\rOptimizing consumption",end="")
         cf = self.model(start_time, end_time, 'cons')
+        print("\r                                             ",end="")
+        print("\rOptimizing carbon",end="")
         carbf = self.model(start_time, end_time, 'carbon')
         price = self.df['SpotPriceDKK'].loc[start_time:end_time]
         
@@ -56,7 +61,11 @@ class SARIMA:
         of['SpotPriceDKK'] = (self.df['SpotPriceDKK'].loc[start_time:end_time]).to_numpy()
         of['CO2Emission'] = carbf['pred'].to_numpy()
         
-        of.set_index(df.loc[start_time:end_time].index,inplace=True)
+        of.set_index(self.df.loc[start_time:end_time].index,inplace=True)
+        print("\r                                             ",end="")
+        print("\rForecasting finished, starting optimization...",end="")
+        print("\n")
+        
         return of
 
 if __name__ == "__main__":
