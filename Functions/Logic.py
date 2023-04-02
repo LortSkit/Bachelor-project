@@ -1,5 +1,5 @@
 # Simple logic battery
-def logic_bat(row, battery, actions=None): #actions only used for DP
+def logic_bat(row, battery): #actions only used for DP
     yieldd = row["yield"]
     battery.charge(yieldd)
     

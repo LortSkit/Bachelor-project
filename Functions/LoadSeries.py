@@ -7,6 +7,8 @@ def load_series(datatype=None,house=None,rename=None, shifts=None):
     lagged features (shifts), as well as the features year, month, day, weekday, and
     hour, for the house specified.
     
+    Return type: Pandas dataframe
+    
     Usage: Feature matrix for when predicting using Random Forest, plotting purposes
     
     
@@ -28,7 +30,7 @@ def load_series(datatype=None,house=None,rename=None, shifts=None):
             
     shifts: list of int, if given, specifies what shifted columns to add
             
-            For report we use shifts = [24, 48, 168]
+            For report, shifts = [24, 48, 168]
            
            
     Example: train_series = load_series("p","h16","val", [24,48,168])
@@ -106,10 +108,34 @@ def load_series(datatype=None,house=None,rename=None, shifts=None):
 
 def moving_average(timeseries, window):
     '''
-    Used to  smoothen timeseries for plotting purposes
+    Used to smoothen timeseries for plotting purposes
+    
+    Return type: Pandas series
+    
+    Usage: Plotting timeseries
     
     
-    Example: moving_average(df['val'], 3).plot(ax=ax, label='val', color='blue')
+    Input:
+    
+    timeseries: Pandas series, series to be plotted
+    
+                Is usually series like production or consumption
+                
+    window: int, how many data points to consider the mean (average) over
+    
+            When wanting to see all the the data, 3 is usually used. Depending on
+            what you want to show, you should change this to something that looks
+            nice.
+    
+    
+    Example: import matplotlib.pyplot as plt
+    
+             fig, ax=plt.subplots(figsize=(11, 3))
+    
+             moving_average(df['val'], 3).plot(ax=ax, label='val', color='blue')
+             
+             ax.legend();
+             plt.show()
     '''
     return timeseries.rolling(window=window, center=True).mean()
 

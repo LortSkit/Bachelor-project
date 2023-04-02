@@ -5,27 +5,38 @@ from Logic import logic_actions, logic_bat
 
 def get_price(surplus, spot_price, percentage_cut):
     '''
-    (Description)
+    Returns cost of buying surplus (kWh) amount at price of spot_price (DKK/kWh)
+    when surplus is negative, when positive returns the negative cost of selling 
+    a surplus amount at percentage_cut (%) times the spot_price
     
-    Usage: (Explanation)
+    Return type: float
+    
+    Usage: Used in MPC and DP cost functions, used when rolling out logic or actions
     
     
     Input:
     
-    surplus: (type), (Explanation)
+    surplus: float, the amount buying (negative) or the amount selling (positive)
              
-             (Explanation)
+             surplus = yield-charge, where yield = production - consumption and
+             charge is the amount chosen to charge, both for a given timestep
+             
+             Both production, consumption and yield are "officially" obtained
+             from the "merge" function from file "Merge.py"
     
-    spot_price: (type), (Explanation)
+    spot_price: float, the price of 1 kWh in DKK
              
-                (Explanation)
+                The spot prices are "officially" obtained from the "merge"
+                function from file "Merge.py"
                 
-    percentage_cut: (type), (Explanation)
+    percentage_cut: float, between 0 and 1, determines sell value buy percentage_cut*spot_price 
              
-                    (Explanation)
+                    This is to emulate the fact that when selling to the grid, taxes
+                    have to be paid, which means when percentage_cut=0.1 (report standard) then
+                    there's 90% taxes
                     
     
-    Example: get_price(-5.5, 0.154039, 0.1) = 0.8472145
+    Example: get_price(-5.5, 0.154039, 0.1) #= 0.8472145
     '''
     
     #Sell
@@ -38,94 +49,154 @@ def get_price(surplus, spot_price, percentage_cut):
     
 def get_emissions(surplus, emission):
     '''
-    (Description)
+    Returns emission cost of buying surplus (kWh) amount at price of 
+    emission (kg/kWh) when surplus is negative, when positive returns the 
+    negative cost of selling a surplus amount at a gain of emission
     
-    Usage: (Explanation)
+    Return type: float
+    
+    Usage: Used in MPC and DP cost functions, used when rolling out logic or actions
     
     
     Input:
     
-    surplus: (type), (Explanation)
+    surplus: float, the amount buying (negative) or the amount selling (positive)
              
-             (Explanation)
+             surplus = yield-charge, where yield = production - consumption and
+             charge is the amount chosen to charge, both for a given timestep
+             
+             Both production, consumption and yield are "officially" obtained
+             from the "merge" function from file "Merge.py"
     
-    emission: (type), (Explanation)
+    emission: float, the carbon emission price of 1 kWh in kg (of carbon)
              
-              (Explanation)
+                The emissions are "officially" obtained from the "merge"
+                function from file "Merge.py"
                     
     
-    Example: get_emissions(-5.5, 0.1370) = 0.7535
+    Example: get_emissions(-5.5, 0.1370) #= 0.7535
     '''
     
     return -surplus*emission
 
 
-def logic_rollout(series_battery, battery, logic, actions=None):
+def _logic_rollout(series_battery, battery, actions):
     '''
-    (Description)
+    Function that applies either logic or actions to series_battery using
+    the battery
     
-    Usage: (Explanation)
+    Return type: Pandas dataframe
+    
+    Usage: Internal function that's used as both logic_rollout and action_rollout
     
     
     Input:
     
-    series_battery: (type), (Explanation)
+    series_battery: Pandas dataframe, Should contain a "yield" column
              
-                    (Explanation)
+                    Usually obtained either from the raw data (perfect predictions)
+                    or from a predictions dataframe
     
-    battery: (type), (Explanation)
+    battery: Battery, A class imported from "Battery.py"
              
-             (Explanation)
+             A simulated battery using the Battery class. For the report
+             the battery has a max_capacity = 13.0 and a max_charge = 7.0
              
-    logic: (type), (Explanation)
+    actions: Pandas dataframe, Should contain a "charge" column
              
-           (Explanation)
-             
-    actions: (type), (Explanation)
-             
-             (Explanation)
+             Actions are usually obtained from another rollout. Rollouts include:
+             logic_rollout, actions_rollout, or pred_logic_rollout
              
     
-    Example: logic_rollout(merged.loc[Start:End], Battery(max_capacity=13), logic_bat)
+    Example: THIS IS AN INTERNAL FUNCTION, SHOULD NOT BE IMPORTED
     '''
     
-    series_battery = series_battery.apply(lambda row: logic(row, battery, actions), axis=1)
+    if actions is not None:
+        series_battery = series_battery.apply(lambda row: logic_actions(row, battery, actions), axis=1)
+    else:
+        series_battery = series_battery.apply(lambda row: logic_bat(row, battery), axis=1)
     series_battery["cost"] = series_battery.apply(lambda row: get_price(row["surplus"], row["SpotPriceDKK"]/1000,0.1), axis=1)
     series_battery["emission"] = series_battery.apply(lambda row: get_emissions(row["surplus"],row["CO2Emission"]/1000), axis=1)
     series_battery["cost_cummulative"] = series_battery["cost"].cumsum(axis=0)
     series_battery["emission_cummulative"] = series_battery["emission"].cumsum(axis=0)
     return series_battery
 
-def action_rollout(series_battery, battery, actions):
+def logic_rollout(series_battery, battery):
     '''
-    (Description)
+    Function that applies the simple logic used in the report. If
+    the battery has max_capacity = 0, then this is also the "no
+    battery" model.
     
-    Usage: (Explanation)
+    Return type: Pandas dataframe
+    
+    Usage: Used when wanting to simulate perfect predictions
     
     
     Input:
     
-    series_battery: (type), (Explanation)
+    series_battery: Pandas dataframe, Should contain a "yield" column
              
-                    (Explanation)
+                    Usually obtained either from the raw data (perfect predictions)
+                    or from a predictions dataframe
     
-    battery: (type), (Explanation)
+    battery: Battery, A class imported from "Battery.py"
              
-             (Explanation)
-             
-    actions: (type), (Explanation)
-             
-             (Explanation)
+             A simulated battery using the Battery class. For the report
+             the battery has a max_capacity = 13.0 and a max_charge = 7.0
              
     
-    Example: action_rollout(merged_i.iloc[:length], Battery(max_capacity=13), actions[:length])
+    Example: merged = merge("h16")
+    
+             series = logic_rollout(merged.loc[Start:End], Battery(max_capacity=13))
     '''
-    return logic_rollout(series_battery, battery, logic_actions, actions)
+    return _logic_rollout(series_battery, battery, None)
+
+def action_rollout(series_battery, battery, actions):
+    '''
+    Function that applies the input actions.
+    
+    Return type: Pandas dataframe
+    
+    Usage: Used when getting actions from other series or any non-logic model
+    
+    
+    Input:
+    
+    series_battery: Pandas dataframe, Should contain a "yield" column
+             
+                    Usually obtained either from the raw data (perfect predictions)
+                    or from a predictions dataframe
+    
+    battery: Battery, A class imported from "Battery.py"
+             
+             A simulated battery using the Battery class. For the report
+             the battery has a max_capacity = 13.0 and a max_charge = 7.0
+             
+    actions: Pandas dataframe, Should contain a "charge" column
+             
+             Actions are usually obtained from another rollout. Rollouts include:
+             logic_rollout, actions_rollout, or pred_logic_rollout
+             
+    
+    Example: merged = merge("h16")
+            
+             rf = RF(house)
+            
+             pred = rf.get_predictions("2022-06-19 00:00:00", "2022-06-19 23:00:00")
+            
+             actions = DP("2022-06-19 00:00:00","2022-06-19 23:00:00","h16",pred,Battery(max_capacity=13),
+                          byday=True,ints=True,degrade=False,verbose=False)
+                
+             series = action_rollout(merged.loc["2022-06-19 00:00:00":"2022-06-19 23:00:00"], Battery(max_capacity=13), actions)
+    '''
+    return _logic_rollout(series_battery, battery, actions)
     
 
-def pred_logic_rollout(series_battery_true,series_battery_pred, battery, logic):
+def pred_logic_rollout(series_battery_true,series_battery_pred, battery):
     '''
     (Description)
+    
+    Return type: (type)
     
     Usage: (Explanation)
     
@@ -144,15 +215,11 @@ def pred_logic_rollout(series_battery_true,series_battery_pred, battery, logic):
              
              (Explanation)
              
-    logic: (type), (Explanation) REDACTED, NOT IN USE
-             
-           (Explanation)
-             
     
     Example: pred_logic_rollout(merged_i, pred_i, Battery(max_capacity=13), logic_bat)
     '''
     
-    series_battery_pred = logic_rollout(series_battery_pred, deepcopy(battery), logic_bat, None)
+    series_battery_pred = logic_rollout(series_battery_pred, deepcopy(battery))
     
     series_battery_true = action_rollout(series_battery_true, battery, series_battery_pred)
     
@@ -162,6 +229,8 @@ def pred_logic_rollout(series_battery_true,series_battery_pred, battery, logic):
 def print_price_summary(series_battery,yearprint=True):
     '''
     (Description)
+    
+    Return type: (type)
     
     Usage: (Explanation)
     
@@ -206,6 +275,8 @@ def print_price_summary(series_battery,yearprint=True):
 def logic_series_print(series_battery):
     '''
     (Description)
+    
+    Return type: (type)
     
     Usage: (Explanation)
     

@@ -52,15 +52,16 @@ def merge(house=None):
     '''
     Combined dataframe of production, consumption, yield, spotprices and emissions.
     
+    Return type: Pandas dataframe
+    
     Usage: Applying price models to a house, getting spotprices or emissions
     
     
     Input:
     
-    datatype: str, specifies whether the production or consumption values are selected
-              
-              "Production", "Consumption", "Emissions", "P", "C", "E", "prod", "cons", 
-              "emis" etc.
+    house: str, specifies which house is selected
+           
+           "k28", "h16", "h22", "h28", or "h32"
     
     
     Example: merged = merge("h16")

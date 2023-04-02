@@ -20,10 +20,10 @@ class MPCModel:
     def norm(self,x):
         return (x-np.min(x))/(np.max(x)-np.min(x))
 
-    def MPCopt_price(self, df, start_time='2022-06-19 00:00:00', end_time = '2022-06-19 23:00:00',ini_bat_state=0,verbose=False):
+    def MPCopt_price(self, df, start_time='2022-06-19 00:00:00', end_time = '2022-06-19 23:00:00',ini_bat_state=0,verbose=False,remote=True):
         n = len(pd.date_range(start_time, end_time,freq='H'))
 
-        m = GEKKO()
+        m = GEKKO(remote=remote)
         charge = m.Array(m.Var, n, lb=-self.max_charge, ub=self.max_charge)
         bat_state = m.Array(m.Var, n+1, lb=0.0, ub=self.max_cap)
 
@@ -90,10 +90,10 @@ class MPCModel:
         
         return of
     
-    def MPCopt_carb(self, df, start_time='2022-06-19 00:00:00', end_time = '2022-06-19 23:00:00',ini_bat_state=0,verbose=False):
+    def MPCopt_carb(self, df, start_time='2022-06-19 00:00:00', end_time = '2022-06-19 23:00:00',ini_bat_state=0,verbose=False,remote=True):
         n = len(pd.date_range(start_time, end_time,freq='H'))
 
-        m = GEKKO()
+        m = GEKKO(remote=remote)
         charge = m.Array(m.Var, n, lb=-self.max_charge, ub=self.max_charge)
         bat_state = m.Array(m.Var, n+1, lb=0.0, ub=self.max_cap)
 
@@ -160,10 +160,10 @@ class MPCModel:
         
         return of
     
-    def MPCopt_(self, df, start_time='2022-06-19 00:00:00', end_time = '2022-06-19 23:00:00',ini_bat_state=0,verbose=False,ratio=0.5):
+    def MPCopt_(self, df, start_time='2022-06-19 00:00:00', end_time = '2022-06-19 23:00:00',ini_bat_state=0,verbose=False,ratio=0.5,remote=True):
         n = len(pd.date_range(start_time, end_time,freq='H'))
 
-        m = GEKKO()
+        m = GEKKO(remote=remote)
         charge = m.Array(m.Var, n, lb=-self.max_charge, ub=self.max_charge)
         bat_state = m.Array(m.Var, n+1, lb=0.0, ub=self.max_cap)
 
@@ -247,7 +247,7 @@ def _model_choice(model_name,MPCModel):
     
     raise Exception("Input must be either 'price', 'carbon', or 'both'!!")
     
-def _MPC(model_name,Start,End,merged,MPCbat,MPCModel,byday,verbose,ratio):
+def _MPC(model_name,Start,End,merged,MPCbat,MPCModel,byday,verbose,ratio,remote):
     model = _model_choice(model_name,MPCModel)
     N=len(pd.date_range(start=Start,end=End,freq="h"))
     series_battery_MPC=pd.DataFrame()
@@ -266,9 +266,9 @@ def _MPC(model_name,Start,End,merged,MPCbat,MPCModel,byday,verbose,ratio):
             print(f"Period from {Start_i} to {End_i}")
 
         if model_name.lower()[0]!="b":
-            actions = model(merged, Start_i, End_i, MPCbat.get_current_capacity(),False)
+            actions = model(merged, Start_i, End_i, MPCbat.get_current_capacity(),verbose,remote)
         else:
-            actions = model(merged, Start_i, End_i, MPCbat.get_current_capacity(),False,ratio)
+            actions = model(merged, Start_i, End_i, MPCbat.get_current_capacity(),verbose,ratio,remote)
 
         series_battery_MPC_i = action_rollout(merged.loc[Start_i:End_i], MPCbat, actions)
 
@@ -283,14 +283,14 @@ def _MPC(model_name,Start,End,merged,MPCbat,MPCModel,byday,verbose,ratio):
     
     return series_battery_MPC
 
-def MPC(Start,End,merged,MPCbat,MPCModel,byday=True,verbose=True):
-    return _MPC("p",Start,End,merged,MPCbat,MPCModel,byday,verbose,None)
+def MPC(Start,End,merged,MPCbat,MPCModel,byday=True,verbose=True, remote=True):
+    return _MPC("p",Start,End,merged,MPCbat,MPCModel,byday,verbose,None,remote)
     
-def MPC_carb(Start,End,merged,MPCbat,MPCModel,byday=True,verbose=True):
-    return _MPC("c",Start,End,merged,MPCbat,MPCModel,byday,verbose,None)
+def MPC_carb(Start,End,merged,MPCbat,MPCModel,byday=True,verbose=True, remote=True):
+    return _MPC("c",Start,End,merged,MPCbat,MPCModel,byday,verbose,None,remote)
 
-def MPC_both(Start,End,merged,MPCbat,MPCModel,ratio=0.5,byday=True,verbose=True):
-    return _MPC("b",Start,End,merged,MPCbat,MPCModel,byday,verbose,ratio)
+def MPC_both(Start,End,merged,MPCbat,MPCModel,ratio=0.5,byday=True,verbose=True, remote=True):
+    return _MPC("b",Start,End,merged,MPCbat,MPCModel,byday,verbose,ratio,remote)
     
 if __name__ == "__main__":
     print("This file is meant to be imported")
