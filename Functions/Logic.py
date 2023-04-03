@@ -279,7 +279,7 @@ def action_rollout(series_battery, battery, actions):
             
              pred = rf.get_predictions("2022-06-19 00:00:00", "2022-06-19 23:00:00")
             
-             actions = DP("2022-06-19 00:00:00","2022-06-19 23:00:00","h16",pred,Battery(max_capacity=13),
+             actions = DP("2022-06-19 00:00:00","2022-06-19 23:00:00",pred,Battery(max_capacity=13),
                           byday=True,ints=True,degrade=False,verbose=False)
                 
              series = action_rollout(merged.loc["2022-06-19 00:00:00":"2022-06-19 23:00:00"], Battery(max_capacity=13), actions)
