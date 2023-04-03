@@ -94,7 +94,7 @@ def logic_bat(row, battery):
             
          Should be used like series_battery.apply(lambda row: logic_bat(row, battery), axis=1)
          
-    battery: Battery, A class imported from "Battery.py"
+    battery: Battery instance, A class imported from "Battery.py"
              
              A simulated battery using the Battery class. For the report
              the battery has a max_capacity = 13.0 and a max_charge = 7.0.
@@ -130,7 +130,7 @@ def logic_actions(row, battery, actions):
             
          Should be used like series_battery.apply(lambda row: logic_actions(row, battery, actions), axis=1)
          
-    battery: Battery, A class imported from "Battery.py"
+    battery: Battery instance, A class imported from "Battery.py"
              
              A simulated battery using the Battery class. For the report
              the battery has a max_capacity = 13.0 and a max_charge = 7.0.
@@ -183,7 +183,7 @@ def _logic_rollout(series_battery, battery, actions):
                     Usually obtained either from the raw data (perfect predictions)
                     or from a predictions dataframe
     
-    battery: Battery, A class imported from "Battery.py"
+    battery: Battery instance, A class imported from "Battery.py"
              
              A simulated battery using the Battery class. For the report
              the battery has a max_capacity = 13.0 and a max_charge = 7.0.
@@ -230,7 +230,7 @@ def logic_rollout(series_battery, battery):
                     Usually obtained either from the raw data (perfect predictions)
                     or from a predictions dataframe
     
-    battery: Battery, A class imported from "Battery.py"
+    battery: Battery instance, A class imported from "Battery.py"
              
              A simulated battery using the Battery class. For the report
              the battery has a max_capacity = 13.0 and a max_charge = 7.0.
@@ -260,11 +260,11 @@ def action_rollout(series_battery, battery, actions):
                     Usually obtained either from the raw data (perfect predictions)
                     or from a predictions dataframe
     
-    battery: Battery, A class imported from "Battery.py"
+    battery: Battery instance, A class imported from "Battery.py"
              
              A simulated battery using the Battery class. For the report
              the battery has a max_capacity = 13.0 and a max_charge = 7.0.
-             The actions will be applied to this battery.
+             The logical actions will be applied to this battery.
              
     actions: Pandas dataframe, Should contain a "charge" column
              
@@ -314,11 +314,11 @@ def pred_logic_rollout(series_battery_true,series_battery_pred, battery):
                          These are the predictions that are obtained from one of
                          the prediction models.
     
-    battery: Battery, A class imported from "Battery.py"
+    battery: Battery instance, A class imported from "Battery.py"
              
              A simulated battery using the Battery class. For the report
              the battery has a max_capacity = 13.0 and a max_charge = 7.0.
-             The actions will be applied to this battery.
+             The logical actions will be applied to this battery.
              
     
     Example: merged = merge("h16")
