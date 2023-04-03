@@ -81,18 +81,18 @@ def get_emissions(surplus, emission):
 
 def logic_bat(row, battery):
     """
-    (Explanation)
+    Simple logic used for rollout, used alongside Pandas DataFrame "apply" function
     
-    Return type: (type)
+    Return type: Pandas series
     
-    Usage: (Explanation)
+    Usage: Used in internal function "_logic_rollout" for simple logic rollout
     
     
     Input:
     
-    row: (type), (Explanation)
+    row: Pandas series, Assumed to be a row of a dataframe. Should have a "yield" column
             
-         (Explanation)
+         Should be used like series_battery.apply(lambda row: logic_bat(row, battery), axis=1)
          
     battery: Battery, A class imported from "Battery.py"
              
@@ -117,18 +117,18 @@ def logic_bat(row, battery):
 
 def logic_actions(row, battery, actions):
     """
-    (Explanation)
+    Action logic used for rollout, used alongside Pandas DataFrame "apply" function
     
-    Return type: (type)
+    Return type: Pandas series
     
-    Usage: (Explanation)
+    Usage: Used in internal function "_logic_rollout" for action rollout
     
     
     Input:
     
-    row: (type), (Explanation)
+    row: Pandas series, Assumed to be a row of a dataframe. Should have a "yield" column
             
-         (Explanation)
+         Should be used like series_battery.apply(lambda row: logic_actions(row, battery, actions), axis=1)
          
     battery: Battery, A class imported from "Battery.py"
              
@@ -136,9 +136,11 @@ def logic_actions(row, battery, actions):
              the battery has a max_capacity = 13.0 and a max_charge = 7.0.
              The logical actions will be applied to this battery.
              
-    actions: (type), (Explanation)
-            
-             (Explanation)
+    actions: Pandas dataframe, Should contain a "charge" column
+             
+             Actions are usually obtained from another rollout or optimization model. 
+             Rollouts include: logic_rollout, actions_rollout, or pred_logic_rollout
+             Optimization models include: DP and MPC (price, carb, both)
     
     Example: THIS IS AN INTERNAL FUNCTION, SHOULD NOT BE IMPORTED
     """
