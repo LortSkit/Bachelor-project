@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from Funcs_Logic_DP import get_price, get_emissions, policy_rollout, action_rollout, DP_stochastic
+from Logic import get_price, get_emissions, action_rollout
 from copy import deepcopy
 
 class DPModel: 
@@ -104,7 +104,99 @@ class DPModel_both(DPModel_c):
         charge = u[0]
         
         return (1-self.ratio)*get_price(yieldd-charge,self.sp[k],0.1)+self.ratio*get_emissions(yieldd-charge,self.ep[k]) 
+
+
+def DP_stochastic(model):
+    """
+    This function implements Algorithm 1, The dynamical programming (DP) algorithm, 
+    from "Sequential Decision-Making" (Feb 2, 2022) by Tue Herlau
     
+    Return type:             dict list * dict list
+                 (float -> float) list * (float -> float) list
+    
+    Usage: This function sees use internally in "DP" function from "DPModel.py",
+           and shouldn't be used otherwise
+    
+    
+    Input:
+    
+    model: DPModel (or DPModel_c or DPModel_both), from "DPModel.py"
+    
+           This model should be a definition of the problem:
+           State spaces, where states are labled "x" (battery capacity)
+           Action space, where actions are labled "u" (charge action)
+           Transition function, called "f" (from state to new state via action)
+           Cost function, called "g" (function to optimize, lower is better)
+             
+    
+    Example: THIS IS AN INTERNAL FUNCTION, SHOULD NOT BE IMPORTED
+    """
+    N = model.N
+    J = [{} for _ in range(N + 1)]
+    pi = [{} for _ in range(N)]
+    J[N] = {x: model.gN(x) for x in model.S(model.N)}
+    for k in range(N-1, -1, -1):
+        for x in model.S(k): 
+            
+            #Determinism requires w is ignored
+            w = False
+
+            Qu = {tuple(u): (model.g(x, u, w, k) + J[k + 1][model.f(x, u, w, k)]) for u in model.A(x, k)} 
+            umin = min(Qu, key=Qu.get)
+            J[k][x] = Qu[umin]
+            pi[k][x] = umin
+
+    return J, pi
+
+
+def policy_rollout(model, pi, x0):
+    """
+    Rolls out the policy obtained from running model in DP_stochastic, with output
+    policy "pi" starting in state x0. The returned "actions" is a dataframe ready
+    for action rollout.
+    
+    Return type: float * float list * Pandas dataframe
+    
+    Usage: This function sees use internally in "DP" function from "DPModel.py",
+           and shouldn't be used otherwise
+    
+    
+    Input:
+    
+    model: DPModel (or DPModel_c or DPModel_both), from "DPModel.py"
+    
+           This model should be a definition of the problem:
+           State spaces, where states are labled "x" (battery capacity)
+           Action space, where actions are labled "u" (charge action)
+           Transition function, called "f" (from state to new state via action)
+           Cost function, called "g" (function to optimize, lower is better)
+           
+    pi: (float * int) -> float, a "function" version of the "pi" output from DP_stochastic
+    
+        
+        Should be passed as pi=lambda x, k: pi[k][x], where the list "pi" is from 
+        DP_stochastic
+        
+    x0: float, initial state of battery
+        
+        Batteries are usually in initial state x0=0, unless this is used
+        as a continuation of a previous rollout like, e.g., single house optimization 
+    
+    Example: THIS IS AN INTERNAL FUNCTION, SHOULD NOT BE IMPORTED
+    """
+    cost = 0
+    J, x, trajectory, actions = 0, x0, [x0], []
+    for k in range(model.N):
+        u = pi(x, k)
+        J += model.g(x, u , True, k)
+        x = model.f(x, u, True, k)
+        trajectory.append(x) # update the list of the trajectory
+        actions.append(u) # update the list of the actions
+    
+    J += model.gN(x)
+    actions = pd.DataFrame(actions,columns=['charge'])
+    actions.index = pd.date_range(start=model.Start, end=model.End, freq="h")
+    return J, trajectory, actions
 
 def _model_choice(model_name):
     if model_name.lower()[0]=="p":

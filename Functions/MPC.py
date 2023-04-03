@@ -3,7 +3,7 @@ import pandas as pd
 from gekko import GEKKO
 from Merge import merge
 from copy import deepcopy
-from Funcs_Logic_DP import action_rollout
+from Logic import action_rollout
 
 class MPCModel:
     def __init__(self, house='h16', sbr_val = 0.1, deg_rate=0.0, num_dec=1,max_charge = 7.0,max_cap = 13.0):
