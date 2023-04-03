@@ -100,12 +100,16 @@ def _logic_rollout(series_battery, battery, actions):
     battery: Battery, A class imported from "Battery.py"
              
              A simulated battery using the Battery class. For the report
-             the battery has a max_capacity = 13.0 and a max_charge = 7.0
+             the battery has a max_capacity = 13.0 and a max_charge = 7.0.
+             The logical actions will be applied to this battery.
              
-    actions: Pandas dataframe, Should contain a "charge" column
+    actions: Pandas dataframe, Should contain a "charge" column, or be None
              
-             Actions are usually obtained from another rollout. Rollouts include:
-             logic_rollout, actions_rollout, or pred_logic_rollout
+             Actions are usually obtained from another rollout or optimization model. 
+             Rollouts include: logic_rollout, actions_rollout, or pred_logic_rollout
+             Optimization models include: DP and MPC (price, carb, both)
+             
+             If None, will run logic_rollout, otherwise runs action_rollout
              
     
     Example: THIS IS AN INTERNAL FUNCTION, SHOULD NOT BE IMPORTED
@@ -120,6 +124,7 @@ def _logic_rollout(series_battery, battery, actions):
     series_battery["cost_cummulative"] = series_battery["cost"].cumsum(axis=0)
     series_battery["emission_cummulative"] = series_battery["emission"].cumsum(axis=0)
     return series_battery
+
 
 def logic_rollout(series_battery, battery):
     '''
@@ -142,7 +147,8 @@ def logic_rollout(series_battery, battery):
     battery: Battery, A class imported from "Battery.py"
              
              A simulated battery using the Battery class. For the report
-             the battery has a max_capacity = 13.0 and a max_charge = 7.0
+             the battery has a max_capacity = 13.0 and a max_charge = 7.0.
+             The logical actions will be applied to this battery.
              
     
     Example: merged = merge("h16")
@@ -150,6 +156,7 @@ def logic_rollout(series_battery, battery):
              series = logic_rollout(merged.loc[Start:End], Battery(max_capacity=13))
     '''
     return _logic_rollout(series_battery, battery, None)
+
 
 def action_rollout(series_battery, battery, actions):
     '''
@@ -170,12 +177,14 @@ def action_rollout(series_battery, battery, actions):
     battery: Battery, A class imported from "Battery.py"
              
              A simulated battery using the Battery class. For the report
-             the battery has a max_capacity = 13.0 and a max_charge = 7.0
+             the battery has a max_capacity = 13.0 and a max_charge = 7.0.
+             The actions will be applied to this battery.
              
     actions: Pandas dataframe, Should contain a "charge" column
              
-             Actions are usually obtained from another rollout. Rollouts include:
-             logic_rollout, actions_rollout, or pred_logic_rollout
+             Actions are usually obtained from another rollout or optimization model. 
+             Rollouts include: logic_rollout, actions_rollout, or pred_logic_rollout
+             Optimization models include: DP and MPC (price, carb, both)
              
     
     Example: merged = merge("h16")
@@ -194,29 +203,45 @@ def action_rollout(series_battery, battery, actions):
 
 def pred_logic_rollout(series_battery_true,series_battery_pred, battery):
     '''
-    (Description)
+    Function that applies the simple logic used in the report on predicted values,
+    and then applies those actions to the raw data. If the battery has 
+    max_capacity = 0, then this is also the "no battery" model
     
-    Return type: (type)
+    Return type: Pandas dataframe
     
-    Usage: (Explanation)
+    Usage: When running the models on predictions; simple logic. Also is sanity check
+           that "no battery" model does nothing still
     
     
     Input:
     
-    series_battery_true: (type), (Explanation)
+    series_battery_true: Pandas dataframe, the raw data (output of "merge" function)
              
-                         (Explanation)
+                         This is the raw data the actions obtained from applying simple
+                         logic to the predictions will be applied to. Should have the
+                         same length as series_battery_pred.
     
-    series_battery_pred: (type), (Explanation)
+    series_battery_pred: Pandas dataframe, the predictions (obtained either from
+                         "rf" class "get_predictions" functions or "SARIMA" class
+                         "SARIMA" function). Should contain a "yield" column
              
-                         (Explanation)
+                         These are the predictions that are obtained from one of
+                         the prediction models.
     
-    battery: (type), (Explanation)
+    battery: Battery, A class imported from "Battery.py"
              
-             (Explanation)
+             A simulated battery using the Battery class. For the report
+             the battery has a max_capacity = 13.0 and a max_charge = 7.0.
+             The actions will be applied to this battery.
              
     
-    Example: pred_logic_rollout(merged_i, pred_i, Battery(max_capacity=13), logic_bat)
+    Example: merged = merge("h16")
+            
+             rf = RF(house)
+            
+             pred = rf.get_predictions("2022-06-19 00:00:00", "2022-06-19 23:00:00")
+             
+             series = pred_logic_rollout(merged.loc["2022-06-19 00:00:00":"2022-06-19 23:00:00"], pred, Battery(max_capacity=13))
     '''
     
     series_battery_pred = logic_rollout(series_battery_pred, deepcopy(battery))
@@ -228,21 +253,29 @@ def pred_logic_rollout(series_battery_true,series_battery_pred, battery):
     
 def print_price_summary(series_battery,yearprint=True):
     '''
-    (Description)
+    Prints information about series_battery, output from any rollout.
+    Rollouts include: logic_rollout, actions_rollout, or pred_logic_rollout
     
-    Return type: (type)
+    Prints period, cost of period, total emissions of period and number
+    of kWh purchased and sold in period. If yearprint, it also prints cost per
+    year, emissions per year, number of kWh purchased and sold per year.
     
-    Usage: (Explanation)
+    Return type: None
+    
+    Usage: Used when wanting to see information about the series, without looking
+           at the whole series. If the whole series is wanted, see "logic_series_print"
+           function
     
     
     Input:
     
-    series_battery: (type), (Explanation)
+    series_battery: Pandas dataframe, Should be output of rollout
              
-                    (Explanation)
+                    This is either a logic or an optimization model run through
+                    any rollout function.
              
     
-    Example: print_price_summary(logic_rollout(merged.loc[Start:End], Battery(max_capacity=13), logic_bat))
+    Example: print_price_summary(logic_rollout(merged.loc[Start:End], Battery(max_capacity=13)))
     '''
     
     start, end = series_battery.index[0], series_battery.index[-1]
@@ -257,38 +290,41 @@ def print_price_summary(series_battery,yearprint=True):
     years_timedelta = time_delta_seconds/(365.25*24*60*60)
     
     if yearprint:
+        print()
         print(f"Average cost per year is: {round(series_battery['cost'].sum()/years_timedelta,0)} DKK")
         print(f"Average emissions per year is: {round(series_battery['emission'].sum()/years_timedelta,0)} kg")
-
+        
+    print()
     print(f"Number of kwh purchased in the period: {-num_wh_total}")
+    print(f"Number of kwh sold in the period: {num_wh_total_sold}")
 
     if yearprint:
+        print()
         print(f"Average number of kwh purchased per year: {-num_wh_total/years_timedelta}")
-       
         print(f"Average number of kwh sold per year: {num_wh_total_sold/years_timedelta}")
+
         
-
-
-    return round(series_battery['cost'].sum()/years_timedelta,0),-num_wh_total/years_timedelta, num_wh_total_sold/years_timedelta
-
-
 def logic_series_print(series_battery):
     '''
-    (Description)
+    Prints ALL values from series_battery, output from any rollout.
+    Rollouts include: logic_rollout, actions_rollout, or pred_logic_rollout
     
-    Return type: (type)
+    Return type: None
     
-    Usage: (Explanation)
+    Usage: Used to examine what actions were taken, prices, battery behaviour and 
+           if the model resorted to buying more than necessary just to charge the
+           battery
     
     
     Input:
     
-    series_battery: (type), (Explanation)
+    series_battery: Pandas dataframe, Should be output of rollout
              
-                    (Explanation)
+                    This is either a logic or an optimization model run through
+                    any rollout function.
              
     
-    Example: logic_series_print(logic_rollout(merged.loc[Start:End], Battery(max_capacity=13), logic_bat))
+    Example: logic_series_print(logic_rollout(merged.loc[Start:End], Battery(max_capacity=13)))
     '''
     
     print(f"{'hour':8s} {'price':8s} {'eprice':8s} {'yield':8s} {'surplus':8s} {'buy':8s} {'charge':8s} {'before':8s} {'degrade':8s} {'after':8s} {'cost':8s} {'pcumsum':8s} {'emis':8s} {'ecumsum':8s}")
