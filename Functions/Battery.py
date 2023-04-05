@@ -149,7 +149,7 @@ class Battery():
             self.degrade(1)
             
         #Shorten to one decimal
-        self.current_capacity = self.round_one_decimal(current_capacity) 
+        self.current_capacity = self.round_one_decimal(self.current_capacity) 
             
         capacity = self.get_current_capacity() #capacity after degrade, before charge/discharge
         self.previous_degraded_capacity = capacity
