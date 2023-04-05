@@ -124,3 +124,6 @@ class EnergyMarket:
         for name, seller in sell_dict.items():
             costs[name] = -seller.total_cost()
         return costs
+    
+if __name__ == "__main__":
+    print("This file is meant to be imported")
