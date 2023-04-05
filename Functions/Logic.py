@@ -205,7 +205,9 @@ def _logic_rollout(series_battery, battery, actions):
         series_battery = series_battery.apply(lambda row: logic_actions(row, battery, actions), axis=1)
     else:
         series_battery = series_battery.apply(lambda row: logic_bat(row, battery), axis=1)
-    series_battery["cost"] = series_battery.apply(lambda row: get_price(row["surplus"], row["SpotPriceDKK"]/1000,0.1), axis=1)
+    
+    fee = 1 #transmission fee
+    series_battery["cost"] = series_battery.apply(lambda row: get_price(row["surplus"], fee+row["SpotPriceDKK"]/1000,0.1), axis=1)
     series_battery["emission"] = series_battery.apply(lambda row: get_emissions(row["surplus"],row["CO2Emission"]/1000), axis=1)
     series_battery["cost_cummulative"] = series_battery["cost"].cumsum(axis=0)
     series_battery["emission_cummulative"] = series_battery["emission"].cumsum(axis=0)

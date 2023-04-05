@@ -205,7 +205,9 @@ class DPModel:
         yieldd = self.get_yield(k)
         charge = u[0]
         
-        return get_price(yieldd-charge,self.sp[k],0.1)
+        fee = 1 #transmission fee
+        
+        return get_price(yieldd-charge,fee+self.sp[k],0.1)
     
     def gN(self, x):
         """
@@ -591,6 +593,10 @@ class DPModel_both(DPModel_c):
     def __init__(self, Start, End, merged, battery,degrade=False,ints=False,acts=None,acts_range=None,ratio=0.5): 
         super().__init__(Start, End, merged, battery,degrade,ints,acts,acts_range)
         self.ratio = ratio
+        
+        fee = 1 #transmission fee
+        self.sp = self.sp+fee
+        
         self.sp = self.norm(self.sp)
         self.ep = self.norm(self.ep)
     
