@@ -5,10 +5,14 @@ from Merge import merge
 from copy import deepcopy
 from Logic import action_rollout
 
+def to_list(arr):
+    return [elem[0] for elem in arr]
+
 class MPCModel:
-    def __init__(self, house='h16', sbr_val = 0.1, deg_rate=0.0, num_dec=1,max_charge = 7.0,max_cap = 13.0):
+    def __init__(self, house='h16', sbr_val = 0.1, fee= 1, deg_rate=0.0, num_dec=1,max_charge = 7.0,max_cap = 13.0):
         self.house = house
         self.sbr_val = sbr_val
+        self.fee = fee
         self.deg_rate = deg_rate
         self.num_dec = num_dec
         self.max_charge = max_charge
@@ -43,7 +47,7 @@ class MPCModel:
         m.Equations([s[i] == y[i] - charge[i] for i in range(n)])
         m.Equations([p[i] == price[i] for i in range(n)])
 
-        cumm_cost = sum([m.if3(s[i],-1*s[i]*p[i], -self.sbr_val*s[i]*p[i]) for i in range(n)])
+        cumm_cost = sum([m.if3(s[i],-1*s[i]*(p[i]+self.fee), -self.sbr_val*s[i]*p[i]) for i in range(n)])
         m.Obj(cumm_cost)
 
         # Solver details
@@ -72,7 +76,7 @@ class MPCModel:
         of['state'] = [bat_state[i][0] for i in range(n)]
         of['surplus'] = [s[i][0] for i in range(n)]
         of['price'] = df['SpotPriceDKK'].loc[start_time:end_time].to_numpy()/1000
-        of['costs'] = [-1*p[i][0]*s[i][0] if s[i][0]<0 else -1*p[i][0]*self.sbr_val*s[i][0] for i in range(n)]
+        of['costs'] = [-1*(p[i][0]+self.fee)*s[i][0] if s[i][0]<0 else -1*p[i][0]*self.sbr_val*s[i][0] for i in range(n)]
         of['cumm_costs'] = of['costs'].cumsum()
         of['em_rate'] = df['CO2Emission'].loc[start_time:end_time].to_numpy()/1000
         of['emission'] = -1*of['surplus']*of['em_rate']
@@ -142,7 +146,7 @@ class MPCModel:
         of['state'] = [bat_state[i][0] for i in range(n)]
         of['surplus'] = [s[i][0] for i in range(n)]
         of['price'] = df['SpotPriceDKK'].loc[start_time:end_time].to_numpy()/1000
-        of['costs'] = [-1*of['price'].loc[i]* of['surplus'].loc[i] if of['surplus'].loc[i]<0 else -1*self.sbr_val*of['price'].iloc[i]* of['surplus'].iloc[i] for i in range(n)]
+        of['costs'] = [-1*(of['price']+self.fee).loc[i]* of['surplus'].loc[i] if of['surplus'].loc[i]<0 else -1*self.sbr_val*of['price'].iloc[i]* of['surplus'].iloc[i] for i in range(n)]
         of['cumm_costs'] = of['costs'].cumsum()
         of['em_rate'] = [carbon[i] for i in range(n)]
         of['emission'] = -1*of['surplus']*of['em_rate']
@@ -171,8 +175,10 @@ class MPCModel:
         
         carbon_ = df['CO2Emission'].loc[start_time:end_time].to_numpy()/1000 # kg/kWh
         price_ = df['SpotPriceDKK'].loc[start_time:end_time].to_numpy()/1000 # DKK/kWh
+        grid_price_ = np.add(price_,self.fee)
         carbon = self.norm(carbon_)
         price = self.norm(price_)
+        grid_price = self.norm(grid_price_)
         
         # Define constraints
         m.Equation(bat_state[0] == ini_bat_state)
@@ -183,14 +189,16 @@ class MPCModel:
         s = m.Array(m.Var, n)
         c = m.Array(m.Var, n)
         p = m.Array(m.Var, n)
+        grpr = m.Array(m.Var, n)
 
         m.Equations([y[i] == yieldd[i] for i in range(n)])
         m.Equations([s[i] == y[i] - charge[i] for i in range(n)])
         m.Equations([c[i] == carbon[i] for i in range(n)])
         m.Equations([p[i] == price[i] for i in range(n)])
+        m.Equations([grpr[i] == grpr[i] for i in range(n)])
         
         c_cost = sum([-1*s[i]*c[i] for i in range(n)])
-        p_cost = sum([m.if3(s[i],-1*s[i]*p[i], -self.sbr_val*s[i]*p[i]) for i in range(n)])
+        p_cost = sum([m.if3(s[i],-1*s[i]*grpr[i], -self.sbr_val*s[i]*p[i]) for i in range(n)])
         m.Obj((1-ratio)*p_cost+ratio*c_cost)
         
         # Solver details
@@ -219,7 +227,7 @@ class MPCModel:
         of['state'] = [bat_state[i][0] for i in range(n)]
         of['surplus'] = [s[i][0] for i in range(n)]
         of['price'] = df['SpotPriceDKK'].loc[start_time:end_time].to_numpy()/1000
-        of['costs'] = [-1*of['price'].loc[i]* of['surplus'].loc[i] if of['surplus'].loc[i]<0 else -1*self.sbr_val*of['price'].iloc[i]* of['surplus'].iloc[i] for i in range(n)]
+        of['costs'] = [-1*(of['price']+self.fee).loc[i]* of['surplus'].loc[i] if of['surplus'].loc[i]<0 else -1*self.sbr_val*of['price'].iloc[i]* of['surplus'].iloc[i] for i in range(n)]
         of['cumm_costs'] = of['costs'].cumsum()
         of['em_rate'] = df['CO2Emission'].loc[start_time:end_time].to_numpy()/1000
         of['emission'] = -1*of['surplus']*of['em_rate']
