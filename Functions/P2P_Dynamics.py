@@ -1,3 +1,6 @@
+def round_one_decimal(number):
+    return float(f"{number:.1f}")
+
 class Buyer:
     def __init__(self, name, price, grid_price, demand):
         self.name = name
@@ -10,17 +13,23 @@ class Buyer:
         self.grid_purchase = 0
     
     def purchase(self, quantity):
+        self.demand -= quantity
         self.peer_purchase += quantity
         self.total_purchase += quantity
-    
-    def unfulfilled_demand(self):
-        return self.demand - self.total_purchase
+        
+        self.demand         = round_one_decimal(self.demand)
+        self.peer_purchase  = round_one_decimal(self.peer_purchase)
+        self.total_purchase = round_one_decimal(self.total_purchase)
     
     def purchase_from_grid(self):
-        demand_gap = self.unfulfilled_demand()
+        demand_gap = self.demand
         cost = demand_gap * self.grid_price
+        self.demand = 0.0
         self.grid_purchase += demand_gap
         self.total_purchase += demand_gap
+        
+        self.grid_purchase  = round_one_decimal(self.grid_purchase)
+        self.total_purchase = round_one_decimal(self.total_purchase)
         return cost
     
     def purchase_from_peers(self):
@@ -41,16 +50,24 @@ class Seller:
         self.grid_sale = 0
     
     def sell(self, quantity):
+        self.supply -= quantity
         self.total_sale += quantity
         self.peer_sale += quantity
-    
-    def unsold_supply(self):
-        return self.supply - self.total_sale
+        
+        self.supply     = round_one_decimal(self.supply)
+        self.total_sale = round_one_decimal(self.total_sale)
+        self.peer_sale  = round_one_decimal(self.peer_sale)
     
     def sell_to_grid(self):
-        unsold = self.unsold_supply()
+        unsold = self.supply
         revenue = unsold * self.price * self.sbr
+        
+        self.supply = 0.0
+        self.grid_sale += unsold
         self.total_sale += unsold
+        
+        self.grid_sale  = round_one_decimal(self.grid_sale)
+        self.total_sale = round_one_decimal(self.total_sale)
         return revenue
     
     def sell_to_peers(self):
@@ -88,7 +105,7 @@ def energy_exchange(buyers, sellers):
         return [buyer, seller] + energy_exchange(buyers, sellers)
 
 class EnergyMarket:
-    def __init__(self, participants, price, grid_price):
+    def __init__(self, participants, price, grid_price, emissions=False):
         self.buyers = {}
         self.sellers = {}
         self.participants = participants
@@ -97,10 +114,16 @@ class EnergyMarket:
         
         for name, value in self.participants.items():
             if value < 0:
-                buyer = Buyer(name, self.price, self.grid_price, -value)
+                if not emissions:
+                    buyer = Buyer(name, self.price, self.grid_price, -value)
+                else:
+                    buyer = Buyer(name, 0, self.grid_price, -value)
                 self.buyers[name] = buyer
             else:
-                seller = Seller(name, self.price, 0.10, value)
+                if not emissions:
+                    seller = Seller(name, self.price, 0.1, value)
+                else:
+                    seller = Seller(name, self.grid_price, 1, value)
                 self.sellers[name] = seller
         
         self.buyers_list = list(self.buyers.values())
