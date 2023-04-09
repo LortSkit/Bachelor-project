@@ -1,7 +1,12 @@
 import numpy as np
 import pandas as pd
+from Battery import Battery
 from Logic import get_price, get_emissions, action_rollout
 from copy import deepcopy
+from P2P_Dynamics import EnergyMarket
+
+from itertools import permutations
+from IPython.display import display, HTML
 
 class DPModel: 
     '''
@@ -659,8 +664,125 @@ class DPModel_both(DPModel_c):
         charge = u[0]
         
         return (1-self.ratio)*get_price(yieldd-charge,self.sp[k],0.1)+self.ratio*get_emissions(yieldd-charge,self.ep[k]) 
+    
+class DP_central(DPModel):
+    def __init__(self, Start, End, merges, houses, battery,degrade=False,ints=False,acts=None,acts_range=None,
+                 furthers=None,traj=None, traj_range=None,max_number_states=200):
+        #Set class attributes
+        super().__init__(Start, End, merges[0], battery,degrade,ints,acts,acts_range)
+        self.merges = merges
+        self.houses = houses
+        self.furthers = furthers
+        self.traj = traj
+        self.traj_range = traj_range
+        self.max_number_states = max_number_states
+        
+        temp = pd.DataFrame(columns=houses)
+        for i in range(len(houses)):
+            temp[houses[i]] = merges[i].loc[Start:End]["yield"]
 
+        self.yields = temp
+    
+        #Compute state space once
+        if ints:
+            states = np.arange(0, battery.max_capacity+1, 1)
+        else:
+            states = np.round(np.arange(0.0, battery.max_capacity+0.01, 0.1),2)
+        
+        self.states = [states for _ in range(len(houses))]
+        
+        if self.ints and self.furthers is not None:
+            for i in range(len(houses)):
+                temp = self.states[i]
+                self.states[i] = temp[temp%self.furthers[i][0]==self.furthers[i][1]]
 
+        self.s = np.array(np.meshgrid(*self.states)).T.reshape(-1,3)
+        self.s = self.s.tolist()
+        self.s = [tuple(x) for x in self.s]
+    
+    def f(self, x, u, w, k):
+        ogbat = self.battery
+        self.battery = deepcopy(ogbat)
+        
+        res = []
+        for i in range(len(self.houses)):
+            self.battery.current_capacity = x[i]
+            self.battery.charge(u[i], degrade=self.degrade)
+
+            if self.ints:
+                self.battery.current_capacity = int(self.battery.current_capacity)
+            
+            res.append(self.battery.get_current_capacity())
+            
+        self.battery = ogbat
+        
+        return tuple(res)
+    
+    def g(self, x, u, w, k):
+        yields = self.get_yield(k)
+        surpluses = [yields[i]-u[i] for i in range(len(u))]
+        
+        fee = 1 #transmission fee
+        
+        participants = {self.houses[i]: surpluses[i] for i in range(len(u))}
+    
+        em = EnergyMarket(participants, self.sp[k], self.sp[k]+fee)
+        
+        dic = em.get_total_costs()
+        
+        return sum([dic[house] for house in self.houses])
+    
+    def S(self, k):
+        if (self.traj is not None) and (self.traj_range is not None):
+            for i in range(len(self.houses)):
+                if self.traj_range[i]==0.0:
+                    self.states[i] = self.traj[k][i]
+                
+            temp = np.array(np.meshgrid(*self.states)).T.reshape(-1,3)
+            temp = temp.tolist()
+            temp = [tuple(x) for x in temp]
+            
+            return temp
+        
+        return self.s
+    
+    def A(self, x, k):
+        states=[]
+        acts = self.acts
+        self.acts=None
+        for i in range(len(x)):
+            temp = super().A(x[i], k)
+            states.append(temp)
+            
+        self.acts=acts
+        
+        if self.ints:
+            states = [states[i][np.array(states[i],dtype=int)==states[i]] for i in range(len(x))]
+            
+        if self.acts is not None and self.acts_range is not None:
+            for i in range(len(x)):
+                if self.acts_range[i]!=0.0:
+                    below =states[i][states[i]<=self.acts[k][i]][-int((self.acts_range[i]+0.1)*10):]
+                    above =states[i][states[i]>self.acts[k][i]][:int(self.acts_range[i]*10)]
+
+                    states[i] = np.append(below,above)
+                else:
+                    states[i] = self.acts[k][i]
+        
+        if self.ints and self.furthers is not None:
+            states = [states[i][(states[i]+x[i])%self.furthers[i][0]==self.furthers[i][1]] for i in range(len(x))]
+            
+        actions = np.array(np.meshgrid(*states)).T.reshape(-1,3)
+        if len(actions)>self.max_number_states:
+            idx = np.round(np.linspace(0, len(actions) - 1, self.max_number_states)).astype(int)
+            actions = actions[idx]
+
+        actions = list(map(tuple,actions))
+        return actions
+    
+    def get_yield(self,k):
+        return self.yields.iloc[k].to_numpy()
+    
 def DP_stochastic(model):
     """
     This function implements Algorithm 1, The dynamical programming (DP) algorithm, 
@@ -702,7 +824,6 @@ def DP_stochastic(model):
             pi[k][x] = umin
 
     return J, pi
-
 
 def policy_rollout(model, pi, x0):
     """
@@ -753,6 +874,46 @@ def policy_rollout(model, pi, x0):
     actions = pd.DataFrame(actions,columns=['charge'])
     actions.index = pd.date_range(start=model.Start, end=model.End, freq="h")
     return J, trajectory, actions
+
+def p2p_rollout(model, pi, x0):
+    """
+    Similar to policy rollout, but for p2p
+    """
+    cost = 0
+    surpluses = []
+    J, x, trajectory, actions = 0, x0, [x0], []
+    for k in range(model.N):
+        u = pi(x, k)
+        price = model.g(x, u , True, k)
+        surpluses.append([model.get_yield(k)[i]-u[i] for i in range(len(u))])
+        J+=price
+
+        x = model.f(x, u, True, k)
+        trajectory.append(x) # update the list of the trajectory
+        actions.append(u) # update the list of the actions
+
+    J += model.gN(x)
+    return J, trajectory, actions, np.array(surpluses)
+
+def tup_add(tup1,tup2):
+    """
+    Adds tuples together, elementwise
+    """
+    res = [int((tup1[i]+tup2[i])*10)/10 for i in range(len(tup1))] 
+    return tuple(res)
+
+def correct_traj_acts(x0,traj,acts):
+    """
+    Makes trajectory start with x0 and applies the actions to it
+    
+    Used in DP_P2P after running actions on ints to correct ints
+    initial state to be the actual state
+    """
+    traj[0]=x0
+    for i in range(len(acts)):
+        traj[i+1]=tup_add(traj[i],acts[i])
+
+    return traj
 
 def _model_choice(model_name):
     """
@@ -1122,6 +1283,418 @@ def DP_both(Start,End,merged,battery,byday=True,ints=True,degrade=False,verbose=
                                byday=True,ints=True,degrade=False,verbose=False)
     """
     return _DP("b",Start,End,merged,battery,byday,ints,degrade,verbose,ratio)
+   
+class DP_P2P:
+    def __init__(self, start_time, end_time, merges, houses, battery):
+        if len(houses)!= len(set(houses)):
+            raise Exception("Duplicate houses are not allowed! Only one type of each house!")
+        if len(houses)<=1:
+            raise Exception("P2P requires more than one house!")
+        if False in [house in ["k28", "h16", "h22", "h28", "h32"] for house in houses]:
+            raise Exception('All houses should be either "k28", "h16", "h22", "h28", or "h32"')
+        if type(battery) is not Battery:
+            raise Exception("battery must be a Battery class instance!")
+            
+        #Attributes, needed for functions
+        self.start_time = start_time
+        self.end_time = end_time
+        self.merges = merges
+        self.houses = houses
+        self.battery = battery
+        self.N = len(pd.date_range(start=start_time,end=end_time,freq="h"))
+        
+        #For P2P_sol function
+        self.results = None
+        self.results_ord = None
+        
+        #For cost_matrix function
+        self.sp = merges[0].loc[start_time:end_time]["SpotPriceDKK"]/1000
+        self.ep = merges[0].loc[start_time:end_time]["CO2Emission"]/1000 #Only the first element in merges needs carbon predictions
+        self.nf = None
+        
+        #For all_sol function
+        self.all_results = None
+        self.all_results_ord = None
+        self.all_nf = None
+        self.all_costs = None
+        self.best_idx = None
+        
+        
+        #Ordered houses and merges
+        all_houses = ["h16", "h22", "h28", "h32", "k28"] 
+        self.all_houses = all_houses
+        
+        houses_ord = []
+        merges_ord = []
+        i=0
+        for house in self.all_houses:
+            if house in self.houses:
+                houses_ord.append(house)
+                merges_ord.append(merges[i])
+                i+=1
+                
+        self.houses_ord = houses_ord
+        self.merges_ord = merges_ord
+
+        #Permutation attributes
+        perms = list(permutations([i+1 for i in range(len(self.houses))]))
+        
+        houses_rewrites = [[self.houses_ord[i-1] for i in perms[j]] for j in range(len(perms))]
+        merges_rewrites = [[self.merges_ord[i-1] for i in perms[j]] for j in range(len(perms))]
+        
+        
+        perms_names = [''.join(str(i) for i in perms[j]) for j in range(len(perms))]
+        
+        self.perms = perms
+        self.houses_rewrites = houses_rewrites
+        self.merges_rewrites = merges_rewrites
+        self.perms_names = perms_names
+        
+        self.this_idx, self.this_perm, self.this_perm_name = self.find_this_perm()
+        
+        #For find_constraints function
+        self.constraints = None
+        self.constraints_ord = None
+
+    def find_constraints(self, x0, verbose=False):
+        """
+        Returns the constraints in the order of the current permutation (this_perm)
+        """
+        #If constraints have NOT previously been calculated
+        if self.constraints_ord is None:
+            constraints = []
+            
+            #Runs single house opt DP on each of the houses to get constraints
+            for i in range(len(self.houses)):
+                bat_copy = deepcopy(self.battery)
+                bat_copy.current_capacity = x0[i]
+                series = DP(self.start_time, self.end_time, self.merges[i], bat_copy, 
+                            byday=True, ints=True, degrade=False, verbose=False)
+                constraints.append(series["cost"].sum())
+
+            self.constraints = constraints
+
+            #Ordered constraints
+            constraints_ord = list(self.this_perm)
+            for j, i in enumerate(self.this_perm):
+                constraints_ord[i-1] = constraints[j]
+
+            self.constraints_ord = constraints_ord
+            
+        #If constraints HAVE previously been calculated
+        else:
+            constraints = [self.constraints_ord[i-1] for i in self.this_perm]
+            self.constraints = constraints
+        
+        if verbose:
+            print(f"The optimality constraints are as follows:")
+            toprint = [house + ": " + str(constraints[i]) for i, house in enumerate(self.houses)]
+            print(*toprint, sep=", ")
+        
+    def find_this_perm(self):
+        """
+        Calculates the current permutation
+        """
+        #Caclulates the current permutation
+        for i, houses in enumerate(self.houses_rewrites):
+            if tuple(houses)==tuple(self.houses):
+                this_idx = i
+                this_perm = self.perms[this_idx]
+                this_perm_name = self.perms_names[this_idx]   
+                
+                return this_idx, this_perm, this_perm_name
+    
+    def DP(self, j, Start, End, x0, max_number_states, trajectory=None, actions=None, ints=False):
+        """
+        Runs the DP model for P2P. This is made specifically for use in P2P_sol function, so don't use this
+        directly
+        """
+        #This is usually the very first run and is, therefore, only really used once per P2P_sol
+        if ints:   
+            #Makes an integer initial state, so that x0_int is in the state space
+            x0_int = tuple([int(x0[i]) for i in range(len(x0))])
+            
+            #This makes sure we only search for actions in the first house
+            furthers=[[1,0]]
+            for t in range(len(self.houses)-1):
+                furthers.append([self.battery.max_capacity+1,x0_int[t+1]])
+
+            #DP and rollout
+            DPP2P= DP_central(Start, End, self.merges, self.houses, deepcopy(self.battery),
+                              degrade=False,ints=True,acts=None,acts_range=None,
+                              furthers=furthers,traj=None,traj_range=None, max_number_states=max_number_states)
+            _, pi = DP_stochastic(DPP2P)
+            
+            J, trajectory, actions, surpluses = p2p_rollout(model=DPP2P, pi=lambda x, k: pi[k][x], x0=x0_int)
+
+            #Corrects the integer 
+            if x0 != x0_int:
+                trajectory = correct_traj_acts(x0,trajectory,actions)
+
+                
+        #After having some initial actions from ints run, this gets run
+        elif (trajectory is not None) and (actions is not None):
+            
+            #This makes sure we only search for actions for one house at a time, that being house number j
+            traj_range = [0 if t!=j+1 else -1 for t in range(len(self.houses))]  
+            
+            #This make sure we search close to previously found actions
+            acts_range = [0 if t!=j+1 else self.battery.max_charge for t in range(len(self.houses))]
+            
+            #DP and rollout
+            DPP2P= DP_central(Start, End, self.merges, self.houses, deepcopy(self.battery),
+                              degrade=False,ints=False,acts=actions,acts_range=acts_range,
+                              furthers=None,traj=trajectory,traj_range=traj_range, max_number_states=max_number_states)
+            _, pi = DP_stochastic(DPP2P)
+
+            J, trajectory, actions, surpluses = p2p_rollout(model=DPP2P, pi=lambda x, k: pi[k][x], x0=x0)
+
+        else:
+            raise Exception("Must have either furthers or trajectory and actions as input!")
+
+        return J, trajectory, actions, surpluses
+        
+    def P2P_sol(self, x0, max_number_states=20, byday=True, verbose=True):
+        """
+        Finds the P2P solution for this permutation only. Perhaps use all_sol function?
+        """
+        #Pre-loop settings
+        N=self.N
+        all_actions = []
+        all_surpluses = np.ones((0,len(self.houses)))
+        Start_i = self.start_time
+        x0_i = x0
+        num_loops = int(np.ceil(N/24)) if byday else 1
+        remainder = N%24
+        length = 24 if byday else N
+        
+        for i in range(num_loops):
+            if byday and i == num_loops-1:
+                length = length if remainder == 0 else remainder
+
+            End_i = pd.date_range(start=Start_i,periods=length,freq="h")[-1]
+
+            if verbose:
+                print(f"Period from {Start_i} to {End_i}")
+            
+            for j in range(len(self.houses)):
+                #Initial ints run
+                if j==0:
+                    J, trajectory, actions, surpluses = self.DP(j, Start_i, End_i, x0_i, max_number_states, 
+                                                                 trajectory=None, actions=None, ints=True)
+                #Runs for one house at a time        
+                J, trajectory, actions, surpluses = self.DP(j, Start_i, End_i, x0_i, max_number_states, 
+                                                             trajectory=trajectory, actions=actions, ints=False)
+            #Update results
+            all_actions = all_actions + actions
+            all_surpluses = np.append(all_surpluses,surpluses,axis=0)
+
+            #End-loop settings
+            Start_i= pd.date_range(start=End_i,periods=2,freq="h")[-1]
+            x0_i = trajectory[-1]
+
+        #Orders results
+        all_surpluses_ord = np.copy(all_surpluses)
+        all_actions_ord = np.array(all_actions)
+        
+        _,this_perm,_ = self.find_this_perm()
+        
+        for j, i in enumerate(this_perm):
+            all_surpluses_ord[:,i-1] = all_surpluses[:,j]
+            all_actions_ord[:,i-1] = np.array(all_actions)[:,j]
+        
+
+        all_actions_ord = list(map(tuple,all_actions_ord))
+        
+        #Save results
+        self.results = (all_actions,all_surpluses)
+        self.results_ord =(all_actions_ord,all_surpluses_ord)
+        
+        return self.results_ord
+    
+    def cost_matrix(self):
+        """
+        Calculates the ordered P2P cost matrix for the saved solution
+        If no solution is saved, returns None
+        """
+        if self.results_ord is None:
+            return None
+        
+        #Cost matrix will always be in sorted order
+        _,surpluses_ord = self.results_ord
+        
+        #Surpluses needed to calculate costs using EnergyMarket class
+        nf = pd.DataFrame()
+        for i,house in enumerate(self.houses_ord):
+            nf[house] = surpluses_ord[:,i]
+            
+        #Calculate costs and emissions
+        costs = pd.DataFrame()
+        emissions = pd.DataFrame()
+        for i in range(len(nf)):
+            temp = pd.DataFrame(EnergyMarket(nf.iloc[i].to_dict(),self.sp[i],self.sp[i]+1).get_total_costs(), index=[0])
+            costs = pd.concat([costs,temp],ignore_index=True)
+            
+            temp = pd.DataFrame(EnergyMarket(nf.iloc[i].to_dict(),-1,self.ep[i],True).get_total_costs(), index=[0])
+            emissions = pd.concat([emissions,temp],ignore_index=True)
+            
+            
+        #Several loops so columns appear in easier to read order
+        for house in self.houses_ord:
+            nf['cost_'+house] = costs[house].to_list()
+        for house in self.houses_ord:
+            nf['cumm_cost_'+house] = nf['cost_'+house].cumsum()  
+        for house in self.houses_ord:
+            nf['emis_'+house] = emissions[house].to_list()
+        for house in self.houses_ord:
+            nf['cumm_emis_'+house] = nf['emis_'+house].cumsum()
+         
+        self.nf = nf
+        return nf
+    
+    def total_cost(self):
+        """
+        Total cost of the current solution if any, otherwise None
+        """
+        if self.nf is None:
+            return None
+        
+        return sum([self.nf['cumm_cost_'+house][len(self.nf)-1] for house in self.houses])
+    
+    def all_sol(self, x0, max_number_states=20, stop_early=True, byday=True, verbose=True):
+        """
+        The definitive run to find a solution that fulfills the optimality constraints
+        
+        If it doesn't find one, all solutions it found are saved, otherwise only the
+        first solution that fulfills constraints is saved
+        """
+        #Constructs the ordered initial state
+        x0_ord = list(self.this_perm)
+        for j, i in enumerate(self.this_perm):
+            x0_ord[i-1] = x0[j]
+            
+        x0_ord = tuple(x0_ord)
+        
+        
+        #Before loop
+        all_results = []
+        all_results_ord = []
+        all_nf = []
+        all_costs = []
+            
+        if verbose:
+            print(f"This permutation is called '{self.this_perm_name}'. Starting with permutation {self.perms_names[i]}") 
+            
+        for i in range(len(self.houses_rewrites)):
+            fulfills = False
+            if verbose:
+                print(f"Permutation {self.perms_names[i]}, ({i+1}/{len(self.perms_names)})")
+            
+            #Updates parameters for use in class functions calls
+            x0 = tuple([x0_ord[j-1] for j in self.perms[i]])
+            self.houses = self.houses_rewrites[i]
+            self.merges = self.merges_rewrites[i]
+            self.this_perm = self.perms[i]
+            
+            if verbose:
+                print()
+            self.find_constraints(x0, verbose = verbose)
+            
+            if verbose:
+                print()
+            
+            #Finds current permutation's solution and cost matrix
+            self.P2P_sol(x0, max_number_states=max_number_states, byday=byday, verbose=verbose)
+            self.cost_matrix()
+            
+            #Updates
+            all_results.append(self.results)
+            all_results_ord.append(self.results_ord)
+            all_nf.append(self.nf)
+            all_costs.append(self.total_cost())
+                  
+            #Checks if constraints are fulfilled
+            checks = [self.nf['cumm_cost_'+house][len(self.nf)-1]<=self.constraints[i] for i,house in enumerate(self.houses)]
+            if not (False in checks):
+                fulfills = True
+                if verbose:
+                    print(f"Permutation {self.perms_names[i]} fulfills constraints!")
+            
+            #Stopping early if constraints are fulfilled
+            if fulfills and stop_early:  
+                if verbose:
+                    print("Stopping early...")
+                    
+                #Resets parameters to what they were before the loop
+                self.houses = self.houses_rewrites[self.this_idx]
+                self.merges = self.merges_rewrites[self.this_idx]
+                self.this_perm = self.perms[self.this_idx]
+                x0 = tuple([x0_ord[j-1] for j in self.perms[self.this_idx]])
+                self.find_constraints(x0)
+                return
+                
+            if verbose:
+                print()
+                print()
+        
+        #Resets parameters to what they were before the loop
+        self.houses = self.houses_rewrites[self.this_idx]
+        self.merges = self.merges_rewrites[self.this_idx]
+        self.this_perm = self.perms[self.this_idx]
+        x0 = tuple([x0_ord[j-1] for j in self.perms[self.this_idx]])
+        self.find_constraints(x0)      
+        
+        #Saves results
+        self.all_results = all_results
+        self.all_results_ord = all_results_ord
+        self.all_nf = all_nf
+        self.all_costs = all_costs
+        self.best_idx = np.argmin(all_costs)
+        
+        if verbose:
+            print("Done!")
+            print()
+            print(f"Best found permutation was {self.perms_names[self.best_idx]} with cost {self.all_costs[self.best_idx]}")
+           
+    def sol_print(self):
+        """
+        Prints the solution obtained from P2P_sol, or all_sol when stopping early
+        """
+        if self.nf is None:
+            return
+        
+        display(HTML(self.nf._repr_html_()))
+        
+    def all_sol_print(self):
+        """
+        Mostly used to see what solutions the all_sol spits out when it doesN'T stop early
+        """
+        if self.all_nf is None:
+            return
+        
+        ognf = self.nf
+        for i in range(len(stuff.all_nf)):
+            self.nf = self.all_nf[i]
+            print(f"This is the cost matrix for sol with permutation {self.perms_names[i]}")
+            self.sol_print()
+            print(f"Total cost this permutation = {self.all_costs[i]}")
+            print()
+            print()
+            print()
+            
+        #Resets parameter to what it was before the loop
+        self.nf = ognf
+            
+    def all_sol_actions(self):
+        """
+        Mostly used to see what actions the all_sol spits out when it doesN'T stop early
+        """
+        if self.all_results_ord is None:
+            return
+        df = pd.DataFrame()
+        for i in range(len(self.all_results_ord)):
+            df["actions"+self.perms_names[i]] = self.all_results_ord[i][0]
+        return df
     
 if __name__ == "__main__":
     print("This file is meant to be imported")
