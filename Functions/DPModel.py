@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from Battery import Battery
-from Logic import get_price, get_emissions, action_rollout
+from Logic import get_price, get_emissions, action_rollout, logic_series_print
 from copy import deepcopy
 from P2P_Dynamics import EnergyMarket
 
@@ -1311,6 +1311,8 @@ class DP_P2P:
         self.sp = merges[0].loc[start_time:end_time]["SpotPriceDKK"]/1000
         self.ep = merges[0].loc[start_time:end_time]["CO2Emission"]/1000 #Only the first element in merges needs carbon predictions
         self.nf = None
+        self.split_costs = None
+        self.split_emis  = None
         
         #For all_sol function
         self.all_results = None
@@ -1355,6 +1357,8 @@ class DP_P2P:
         #For find_constraints function
         self.constraints = None
         self.constraints_ord = None
+        self.all_series = None
+        self.all_series_ord = None
 
     def find_constraints(self, x0, verbose=False):
         """
@@ -1363,6 +1367,7 @@ class DP_P2P:
         #If constraints have NOT previously been calculated
         if self.constraints_ord is None:
             constraints = []
+            all_series = []
             
             #Runs single house opt DP on each of the houses to get constraints
             for i in range(len(self.houses)):
@@ -1371,15 +1376,20 @@ class DP_P2P:
                 series = DP(self.start_time, self.end_time, self.merges[i], bat_copy, 
                             byday=True, ints=True, degrade=False, verbose=False)
                 constraints.append(series["cost"].sum())
+                all_series.append(series)
 
             self.constraints = constraints
+            self.all_series  = all_series
 
             #Ordered constraints
             constraints_ord = list(self.this_perm)
+            all_series_ord = deepcopy(all_series)
             for j, i in enumerate(self.this_perm):
                 constraints_ord[i-1] = constraints[j]
+                all_series_ord[i-1] = all_series[j]
 
             self.constraints_ord = constraints_ord
+            self.all_series_ord  = all_series_ord
             
         #If constraints HAVE previously been calculated
         else:
@@ -1510,6 +1520,8 @@ class DP_P2P:
         self.results = (all_actions,all_surpluses)
         self.results_ord =(all_actions_ord,all_surpluses_ord)
         
+        self.cost_matrix()
+        
         return self.results_ord
     
     def cost_matrix(self):
@@ -1517,7 +1529,9 @@ class DP_P2P:
         Calculates the ordered P2P cost matrix for the saved solution
         If no solution is saved, returns None
         """
+        
         if self.results_ord is None:
+            print("results_ord not found. Try running P2P_sol or all_sol")
             return None
         
         #Cost matrix will always be in sorted order
@@ -1531,13 +1545,23 @@ class DP_P2P:
         #Calculate costs and emissions
         costs = pd.DataFrame()
         emissions = pd.DataFrame()
+        split_costs = []
+        split_emis  = []
         for i in range(len(nf)):
-            temp = pd.DataFrame(EnergyMarket(nf.iloc[i].to_dict(),self.sp[i],self.sp[i]+1).get_total_costs(), index=[0])
+            em = EnergyMarket(nf.iloc[i].to_dict(),self.sp[i],self.sp[i]+1)
+            temp = pd.DataFrame(em.get_total_costs(), index=[0])
             costs = pd.concat([costs,temp],ignore_index=True)
             
-            temp = pd.DataFrame(EnergyMarket(nf.iloc[i].to_dict(),-1,self.ep[i],True).get_total_costs(), index=[0])
+            split_costs.append(em.split_costs)
+            
+            em = EnergyMarket(nf.iloc[i].to_dict(),-1,self.ep[i],True)
+            temp = pd.DataFrame(em.get_total_costs(), index=[0])
             emissions = pd.concat([emissions,temp],ignore_index=True)
             
+            split_emis.append(em.split_costs)
+        
+        self.split_costs = split_costs
+        self.split_emis  = split_emis
             
         #Several loops so columns appear in easier to read order
         for house in self.houses_ord:
@@ -1557,7 +1581,8 @@ class DP_P2P:
         Total cost of the current solution if any, otherwise None
         """
         if self.nf is None:
-            return None
+            print("nf not found. Try running P2P_sol or all_sol")
+            return 
         
         return sum([self.nf['cumm_cost_'+house][len(self.nf)-1] for house in self.houses])
     
@@ -1583,7 +1608,7 @@ class DP_P2P:
         all_costs = []
             
         if verbose:
-            print(f"This permutation is called '{self.this_perm_name}'. Starting with permutation {self.perms_names[i]}") 
+            print(f"This permutation is called '{self.this_perm_name}'. Starting with permutation '{self.perms_names[0]}'") 
             
         for i in range(len(self.houses_rewrites)):
             fulfills = False
@@ -1605,7 +1630,6 @@ class DP_P2P:
             
             #Finds current permutation's solution and cost matrix
             self.P2P_sol(x0, max_number_states=max_number_states, byday=byday, verbose=verbose)
-            self.cost_matrix()
             
             #Updates
             all_results.append(self.results)
@@ -1631,6 +1655,8 @@ class DP_P2P:
                 self.this_perm = self.perms[self.this_idx]
                 x0 = tuple([x0_ord[j-1] for j in self.perms[self.this_idx]])
                 self.find_constraints(x0)
+                
+                self.update_series(x0_ord)
                 return
                 
             if verbose:
@@ -1641,8 +1667,10 @@ class DP_P2P:
         self.houses = self.houses_rewrites[self.this_idx]
         self.merges = self.merges_rewrites[self.this_idx]
         self.this_perm = self.perms[self.this_idx]
-        x0 = tuple([x0_ord[j-1] for j in self.perms[self.this_idx]])
+        x0 = tuple([x0_ord[j-1] for j in self.this_perm])
         self.find_constraints(x0)      
+        
+        self.update_series(x0_ord)
         
         #Saves results
         self.all_results = all_results
@@ -1656,11 +1684,50 @@ class DP_P2P:
             print()
             print(f"Best found permutation was {self.perms_names[self.best_idx]} with cost {self.all_costs[self.best_idx]}")
            
+    def update_series(self, x0_ord):
+        if (self.nf is None) or (self.all_series_ord is None) or (self.results_ord is None):
+            print("nf, all_series_ord, or results_ord not found. Try running all_sol")
+            return
+        
+        for i,house in enumerate(self.houses_ord):
+            series = self.all_series_ord[i]
+            acts,_ = self.results_ord
+            
+            actions = pd.DataFrame(columns=["charge"])
+            actions["charge"]=np.array(acts)[:,i]
+            actions.index = series.index
+            
+            bat_copy = deepcopy(self.battery)
+            bat_copy.current_capacity = x0_ord[i]
+            
+            series = action_rollout(series,bat_copy,actions)
+            
+            all_grid = []
+            all_peer = []
+            for j in range(len(self.split_costs)):
+                grid,peer = self.split_costs[j][house]
+                
+                all_grid.append(grid)
+                all_peer.append(peer)
+                
+            series["grid"] = all_grid
+            series["peer"] = all_peer
+            
+            series["cost"]                 = list(self.nf['cost_'+house]) 
+            series["cost_cummulative"]     = list(self.nf['cumm_cost_'+house])
+            series["emission"]             = list(self.nf['emis_'+house]) 
+            series["emission_cummulative"] = list(self.nf['cumm_emis_'+house])
+            
+            self.all_series_ord[i] = series
+            
+        self.all_series = [self.all_series_ord[j-1] for j in self.this_perm]
+        
     def sol_print(self):
         """
-        Prints the solution obtained from P2P_sol, or all_sol when stopping early
+        Prints the solution obtained from P2P_sol or all_sol
         """
         if self.nf is None:
+            print("nf not found. Try running P2P_sol or all_sol")
             return
         
         display(HTML(self.nf._repr_html_()))
@@ -1670,6 +1737,7 @@ class DP_P2P:
         Mostly used to see what solutions the all_sol spits out when it doesN'T stop early
         """
         if self.all_nf is None:
+            print("all_nf not found. Try running all_sol with stop_early=False")
             return
         
         ognf = self.nf
@@ -1690,11 +1758,31 @@ class DP_P2P:
         Mostly used to see what actions the all_sol spits out when it doesN'T stop early
         """
         if self.all_results_ord is None:
+            print("all_results_ord not found. Try running all_sol with stop_early=False")
             return
         df = pd.DataFrame()
         for i in range(len(self.all_results_ord)):
             df["actions"+self.perms_names[i]] = self.all_results_ord[i][0]
         return df
+    
+    def series_print(self, house):
+        if house not in self.houses:
+            raise Exception(f"Input house must be contained in this instance's houses: {self.houses}")
+        
+        if (self.all_series is None):
+            print("all_series not found. Try running all_sol")
+            return
+            
+        i = self.houses.index(house)
+            
+        logic_series_print(self.all_series[i], p2p=True)
+        
+    def all_series_print(self):
+        for house in self.houses_ord:
+            print(f"Series for house {house}:")
+            self.series_print(house)
+            print()
+            print()
     
 if __name__ == "__main__":
     print("This file is meant to be imported")

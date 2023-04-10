@@ -147,6 +147,7 @@ def logic_actions(row, battery, actions):
     yieldd = row["yield"]
     charge = actions.loc[row.name]["charge"]
 
+    #Charging more than necessary
     if yieldd<=0:
         buy=charge if charge>0 else 0.0
     else:
@@ -155,6 +156,15 @@ def logic_actions(row, battery, actions):
         else:
             buy=0.0
 
+    #Discharging more than necessary
+    if yieldd>0:
+        sell=charge if charge<0 else 0.0
+    else:
+        if yieldd>=charge:
+            sell=charge-yieldd
+        else:
+            sell=0.0
+
     battery.charge(charge)
 
     row["capacity_before"] = battery.get_previous_capacity()
@@ -162,7 +172,7 @@ def logic_actions(row, battery, actions):
     row["capacity_after"] = battery.get_current_capacity()
     row["surplus"] = yieldd-charge
     row["charge"] = charge
-    row["buy"] = buy
+    row["buy"] = buy+sell
     return row
 
 
@@ -392,7 +402,7 @@ def print_price_summary(series_battery,yearprint=True):
         print(f"Average number of kwh sold per year: {num_wh_total_sold/years_timedelta}")
 
         
-def logic_series_print(series_battery):
+def logic_series_print(series_battery, p2p=False):
     '''
     Prints ALL values from series_battery, output from any rollout.
     Rollouts include: logic_rollout, actions_rollout, or pred_logic_rollout
@@ -410,28 +420,57 @@ def logic_series_print(series_battery):
              
                     This is either a logic or an optimization model run through
                     any rollout function.
+                    
+    p2p: bool, optional input that's False by default
+    
+         If true, will assume the logical series has been updated to reflect it's
+         actions in a p2p setting: There's now a "grid" and "peer" column that 
+         show how much it has bought from the grid and from its peers at that timestep.
              
     
     Example: logic_series_print(logic_rollout(merged.loc[Start:End], Battery(max_capacity=13)))
     '''
-    
-    print(f"{'hour':8s} {'price':8s} {'eprice':8s} {'yield':8s} {'surplus':8s} {'buy':8s} {'charge':8s} {'before':8s} {'degrade':8s} {'after':8s} {'cost':8s} {'pcumsum':8s} {'emis':8s} {'ecumsum':8s}")
+    if not p2p:
+        print(f"{' hour':5s}  {'   price':8s}  {'  eprice':8s}  {' yield':6s} {' surpl':6s} {'  buy':5s} {'  act':5s} {'   bef':6s} {'   deg':6s} {'   aft':6s}  {'    cost':8s}  {' pcumsum':8s}  {'    emis':8s}  {' ecumsum':8s}")
 
-    for i in range(len(series_battery)):
-        spot    = series_battery.iloc[i]['SpotPriceDKK']/1000
-        eprice  = series_battery.iloc[i]['CO2Emission']/1000
-        yieldd  = series_battery.iloc[i]['yield']
-        surplus = series_battery.iloc[i]['surplus']
-        buy     = series_battery.iloc[i]['buy']
-        charge  = series_battery.iloc[i]['charge']
-        before  = series_battery.iloc[i]['capacity_before']
-        degrade = series_battery.iloc[i]['capacity_degraded']
-        after   = series_battery.iloc[i]['capacity_after']
-        cost    = series_battery.iloc[i]['cost']
-        emis    = series_battery.iloc[i]['emission']
-        cost_c  = series_battery.iloc[i]['cost_cummulative']
-        emis_c  = series_battery.iloc[i]['emission_cummulative']
-        print(f"{i:5d}: {spot:8.4f},{eprice:8.4f},{yieldd:8.4f},{surplus:8.4f},{buy:8.4f},{charge:8.4f},{before:8.4f},{degrade:8.4f},{after:8.4f},{cost:8.4f},{cost_c:8.4f},{emis:8.4f},{emis_c:8.4f}")
+        for i in range(len(series_battery)):
+            spot    = series_battery.iloc[i]['SpotPriceDKK']/1000
+            eprice  = series_battery.iloc[i]['CO2Emission']/1000
+            yieldd  = series_battery.iloc[i]['yield']
+            surplus = series_battery.iloc[i]['surplus']
+            buy     = series_battery.iloc[i]['buy']
+            charge  = series_battery.iloc[i]['charge']
+            before  = series_battery.iloc[i]['capacity_before']
+            degrade = series_battery.iloc[i]['capacity_degraded']
+            after   = series_battery.iloc[i]['capacity_after']
+            cost    = series_battery.iloc[i]['cost']
+            emis    = series_battery.iloc[i]['emission']
+            cost_c  = series_battery.iloc[i]['cost_cummulative']
+            emis_c  = series_battery.iloc[i]['emission_cummulative']
+        
+            print(f"{i:5d}: {spot:8.4f}, {eprice:8.4f}, {yieldd:6.1f},{surplus:6.1f},{buy:5.1f},{charge:5.1f},{before:6.1f},{degrade:6.1f},{after:6.1f}, {cost:8.4f}, {cost_c:8.4f}, {emis:8.4f}, {emis_c:8.4f}")
+            
+    else:
+        print(f"{' hour':5s}  {'   price':8s}  {'  eprice':8s}  {' yield':6s} {' surpl':6s} {' grid':5s} {' peer':5s} {'  buy':5s} {'  act':5s} {'   bef':6s} {'   deg':6s} {'   aft':6s}  {'    cost':8s}  {' pcumsum':8s}  {'    emis':8s}  {' ecumsum':8s}")
+
+        for i in range(len(series_battery)):
+            spot    = series_battery.iloc[i]['SpotPriceDKK']/1000
+            eprice  = series_battery.iloc[i]['CO2Emission']/1000
+            yieldd  = series_battery.iloc[i]['yield']
+            surplus = series_battery.iloc[i]['surplus']
+            grid    = series_battery.iloc[i]['grid']
+            peer    = series_battery.iloc[i]['peer']
+            buy     = series_battery.iloc[i]['buy']
+            charge  = series_battery.iloc[i]['charge']
+            before  = series_battery.iloc[i]['capacity_before']
+            degrade = series_battery.iloc[i]['capacity_degraded']
+            after   = series_battery.iloc[i]['capacity_after']
+            cost    = series_battery.iloc[i]['cost']
+            emis    = series_battery.iloc[i]['emission']
+            cost_c  = series_battery.iloc[i]['cost_cummulative']
+            emis_c  = series_battery.iloc[i]['emission_cummulative']
+        
+            print(f"{i:5d}: {spot:8.4f}, {eprice:8.4f}, {yieldd:6.1f},{surplus:6.1f},{grid:5.1f},{peer:5.1f},{buy:5.1f},{charge:5.1f},{before:6.1f},{degrade:6.1f},{after:6.1f}, {cost:8.4f}, {cost_c:8.4f}, {emis:8.4f}, {emis_c:8.4f}")
         
 
 if __name__ == "__main__":

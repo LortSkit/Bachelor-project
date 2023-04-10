@@ -111,6 +111,9 @@ class EnergyMarket:
         self.participants = participants
         self.price = price
         self.grid_price = grid_price
+        self.costs = False
+        self.total_costs = None
+        self.split_costs = None
         
         for name, value in self.participants.items():
             if value < 0:
@@ -136,17 +139,26 @@ class EnergyMarket:
         return self.sellers
 
     def cal_costs(self):
-        results = energy_exchange(self.buyers_list,self.sellers_list)
+        if not self.costs:
+            results = energy_exchange(self.buyers_list,self.sellers_list)
+            self.costs = True
         return self.buyers, self.sellers
     
     def get_total_costs(self):
-        buy_dict, sell_dict = self.cal_costs()
-        costs = {}
-        for name, buyer in buy_dict.items():
-            costs[name] = buyer.total_cost()
-        for name, seller in sell_dict.items():
-            costs[name] = -seller.total_cost()
-        return costs
+        if self.total_costs is None:
+            buy_dict, sell_dict = self.cal_costs()
+            costs = {}
+            split_costs = {}
+            for name, buyer in buy_dict.items():
+                costs[name] = buyer.total_cost()
+                split_costs[name] = [buyer.grid_purchase,buyer.peer_purchase]
+            for name, seller in sell_dict.items():
+                costs[name] = -seller.total_cost()
+                split_costs[name] = [-seller.grid_sale,-seller.peer_sale]
+            
+            self.total_costs = costs
+            self.split_costs = split_costs
+        return self.total_costs
     
 if __name__ == "__main__":
     print("This file is meant to be imported")
