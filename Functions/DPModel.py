@@ -1354,6 +1354,8 @@ class DP_P2P:
         
         self.this_idx, self.this_perm, self.this_perm_name = self.find_this_perm()
         
+        self.last_perm = self.this_perm
+        
         #For find_constraints function
         self.constraints = None
         self.constraints_ord = None
@@ -1464,10 +1466,12 @@ class DP_P2P:
 
         return J, trajectory, actions, surpluses
         
-    def P2P_sol(self, x0, max_number_states=20, byday=True, verbose=True):
+    def P2P_sol(self, x0, max_number_states=20, byday=True, verbose=True, acts=False):
         """
         Finds the P2P solution for this permutation only. Perhaps use all_sol function?
         """
+        self.find_constraints(x0, verbose=verbose)
+        
         #Pre-loop settings
         N=self.N
         all_actions = []
@@ -1486,18 +1490,36 @@ class DP_P2P:
 
             if verbose:
                 print(f"Period from {Start_i} to {End_i}")
-            
-            for j in range(len(self.houses)):
-                #Initial ints run
-                if j==0:
+            if not acts:
+                for j in range(len(self.houses)):
+                    #Initial ints run
+                    if j==0:
+                        J, trajectory, actions, surpluses = self.DP(j, Start_i, End_i, x0_i, max_number_states, 
+                                                                     trajectory=None, actions=None, ints=True)
+                    #Runs for one house at a time        
                     J, trajectory, actions, surpluses = self.DP(j, Start_i, End_i, x0_i, max_number_states, 
-                                                                 trajectory=None, actions=None, ints=True)
-                #Runs for one house at a time        
-                J, trajectory, actions, surpluses = self.DP(j, Start_i, End_i, x0_i, max_number_states, 
-                                                             trajectory=trajectory, actions=actions, ints=False)
+                                                                 trajectory=trajectory, actions=actions, ints=False)
+            else:
+                trajectory = correct_traj_acts(x0,self.results[0]+[x0],self.results[0])
+                    
+                #This make sure we search close to previously found actions
+                traj_range = [0 for t in range(len(self.houses))]
+                
+                #This make sure we search close to previously found actions
+                acts_range = [0 for t in range(len(self.houses))]
+
+                #DP and rollout
+                DPP2P= DP_central(Start_i, End_i, self.merges, self.houses, deepcopy(self.battery),
+                                  degrade=False,ints=False,acts=self.results[0],acts_range=acts_range,
+                                  furthers=None,traj=trajectory,traj_range=traj_range, max_number_states=max_number_states)
+                _, pi = DP_stochastic(DPP2P)
+
+                J, trajectory, actions, surpluses = p2p_rollout(model=DPP2P, pi=lambda x, k: pi[k][x], x0=x0)
+            
             #Update results
             all_actions = all_actions + actions
             all_surpluses = np.append(all_surpluses,surpluses,axis=0)
+           
 
             #End-loop settings
             Start_i= pd.date_range(start=End_i,periods=2,freq="h")[-1]
@@ -1521,6 +1543,14 @@ class DP_P2P:
         self.results_ord =(all_actions_ord,all_surpluses_ord)
         
         self.cost_matrix()
+        
+        #needed for update_series
+        x0_ord = list(self.this_perm)
+        for j, i in enumerate(self.this_perm):
+            x0_ord[i-1] = x0[j]
+
+        x0_ord = tuple(x0_ord)
+        self.update_series(x0_ord)
         
         return self.results_ord
     
@@ -1620,6 +1650,7 @@ class DP_P2P:
             self.houses = self.houses_rewrites[i]
             self.merges = self.merges_rewrites[i]
             self.this_perm = self.perms[i]
+            self.last_perm = self.this_perm
             
             if verbose:
                 print()
@@ -1691,7 +1722,7 @@ class DP_P2P:
         
         for i,house in enumerate(self.houses_ord):
             series = self.all_series_ord[i]
-            acts,_ = self.results_ord
+            acts,surp = self.results_ord
             
             actions = pd.DataFrame(columns=["charge"])
             actions["charge"]=np.array(acts)[:,i]
@@ -1741,7 +1772,7 @@ class DP_P2P:
             return
         
         ognf = self.nf
-        for i in range(len(stuff.all_nf)):
+        for i in range(len(self.all_nf)):
             self.nf = self.all_nf[i]
             print(f"This is the cost matrix for sol with permutation {self.perms_names[i]}")
             self.sol_print()
