@@ -431,7 +431,7 @@ def logic_series_print(series_battery, p2p=False):
     Example: logic_series_print(logic_rollout(merged.loc[Start:End], Battery(max_capacity=13)))
     '''
     if not p2p:
-        print(f"{' hour':5s}  {'   price':8s}  {'  eprice':8s}  {' yield':6s} {' surpl':6s} {'  buy':5s} {'  act':5s} {'   bef':6s} {'   deg':6s} {'   aft':6s}  {'    cost':8s}  {' pcumsum':8s}  {'    emis':8s}  {' ecumsum':8s}")
+        print(f"{' hour':5s}  {'   price':8s}  {'  eprice':8s}  {' yield':6s} {' surpl':6s} {'  ext':5s} {'  act':5s} {'   bef':6s} {'   deg':6s} {'   aft':6s}  {'    cost':8s}  {' pcumsum':8s}  {'    emis':8s}  {' ecumsum':8s}")
 
         for i in range(len(series_battery)):
             spot    = series_battery.iloc[i]['SpotPriceDKK']/1000
@@ -451,7 +451,7 @@ def logic_series_print(series_battery, p2p=False):
             print(f"{i:5d}: {spot:8.4f}, {eprice:8.4f}, {yieldd:6.1f},{surplus:6.1f},{buy:5.1f},{charge:5.1f},{before:6.1f},{degrade:6.1f},{after:6.1f}, {cost:8.4f}, {cost_c:8.4f}, {emis:8.4f}, {emis_c:8.4f}")
             
     else:
-        print(f"{' hour':5s}  {'   price':8s}  {'  eprice':8s}  {' yield':6s} {' surpl':6s} {' grid':5s} {' peer':5s} {'  buy':5s} {'  act':5s} {'   bef':6s} {'   deg':6s} {'   aft':6s}  {'    cost':8s}  {' pcumsum':8s}  {'    emis':8s}  {' ecumsum':8s}")
+        print(f"{' hour':5s}  {'   price':8s}  {'  eprice':8s}  {' yield':6s} {' surpl':6s} {' grid':5s} {' peer':5s} {'  ext':5s} {'  act':5s} {'   bef':6s} {'   deg':6s} {'   aft':6s}  {'    cost':8s}  {' pcumsum':8s}  {'    emis':8s}  {' ecumsum':8s}")
 
         for i in range(len(series_battery)):
             spot    = series_battery.iloc[i]['SpotPriceDKK']/1000
