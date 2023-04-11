@@ -160,5 +160,14 @@ class EnergyMarket:
             self.split_costs = split_costs
         return self.total_costs
     
+def EnergyMarkets(houses, surpluses, p, fee):
+    total_costs = [0 for _ in range(len(houses))]
+    for i in range(len(surpluses)):
+        em = EnergyMarket({house: surpluses[j][i].value for j, house in enumerate(houses)},p[i],p[i]+fee)
+        step_costs = em.get_total_costs()
+        total_costs = [total_costs[j] + step_costs[house] for j, house in enumerate(houses)]
+        
+    return total_costs
+    
 if __name__ == "__main__":
     print("This file is meant to be imported")
