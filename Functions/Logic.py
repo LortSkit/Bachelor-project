@@ -158,7 +158,7 @@ def logic_actions(row, battery, actions):
 
     #Discharging more than necessary
     if yieldd>0:
-        sell=charge if charge<0 else 0.0
+        sell=charge if charge<=0 else 0.0
     else:
         if yieldd>=charge:
             sell=charge-yieldd
