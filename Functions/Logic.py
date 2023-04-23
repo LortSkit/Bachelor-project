@@ -157,10 +157,10 @@ def logic_actions(row, battery, actions):
             buy=0.0
 
     #Discharging more than necessary
-    if yieldd>0:
-        sell=charge if charge<=0 else 0.0
+    if yieldd>=0:
+        sell=charge if charge<0 else 0.0
     else:
-        if yieldd>=charge:
+        if yieldd>charge:
             sell=charge-yieldd
         else:
             sell=0.0
