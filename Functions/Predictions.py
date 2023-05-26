@@ -313,10 +313,13 @@ class RF:
             raise Exception("First input must specify either Production or Consumption, or Emissions")
         elif datatype[0].lower()=="p":
             train_series = self.df_prod
+            datatype_str = "prod_"+self.house
         elif datatype[0].lower()=="c":
             train_series = self.df_cons
+            datatype_str = "cons_"+self.house
         elif datatype[0].lower()=="e":
             train_series = self.df_carb
+            datatype_str = "carb_"+self.house
         
 
         search_space = {'n_estimators' : Integer(2, 1000, "uniform", name='n_estimators'),
@@ -339,12 +342,12 @@ class RF:
 
             train_size = train_sizes[i]
             Before     = Befores[i]
-
+            
             #Tune
             results, frozen_trial = bayesian_search_forecaster(
                                         forecaster         = forecaster,
-                                        y                  = train_series.loc[Before:End]['val'],
-                                        exog               = train_series.loc[Before:End].drop(['val'], axis=1),
+                                        y                  = train_series.loc[Before:End][datatype_str],
+                                        exog               = train_series.loc[Before:End].drop([datatype_str], axis=1),
                                         lags_grid          = lags_grid,
                                         search_space       = search_space,
                                         steps              = 24,
