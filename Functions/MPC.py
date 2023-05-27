@@ -175,10 +175,11 @@ class MPCModel:
         
         carbon_ = df['CO2Emission'].loc[start_time:end_time].to_numpy()/1000 # kg/kWh
         price_ = df['SpotPriceDKK'].loc[start_time:end_time].to_numpy()/1000 # DKK/kWh
-        grid_price_ = np.add(price_,self.fee)
+        price = self.norm([i+self.fee for i in price_])
+        #grid_price_ = np.add(price_,self.fee)
         carbon = self.norm(carbon_)
-        price = self.norm(price_)
-        grid_price = self.norm(grid_price_)
+        #price = self.norm(price_)
+        #grid_price = self.norm(grid_price_)
         
         # Define constraints
         m.Equation(bat_state[0] == ini_bat_state)
@@ -189,16 +190,16 @@ class MPCModel:
         s = m.Array(m.Var, n)
         c = m.Array(m.Var, n)
         p = m.Array(m.Var, n)
-        grpr = m.Array(m.Var, n)
+        #grpr = m.Array(m.Var, n)
 
         m.Equations([y[i] == yieldd[i] for i in range(n)])
         m.Equations([s[i] == y[i] - charge[i] for i in range(n)])
         m.Equations([c[i] == carbon[i] for i in range(n)])
         m.Equations([p[i] == price[i] for i in range(n)])
-        m.Equations([grpr[i] == grpr[i] for i in range(n)])
+        #m.Equations([grpr[i] == grpr[i] for i in range(n)])
         
         c_cost = sum([-1*s[i]*c[i] for i in range(n)])
-        p_cost = sum([m.if3(s[i],-1*s[i]*grpr[i], -self.sbr_val*s[i]*p[i]) for i in range(n)])
+        p_cost = sum([m.if3(s[i],-1*s[i]*(p[i]), -self.sbr_val*s[i]*(p[i]-self.fee)) for i in range(n)])
         m.Obj((1-ratio)*p_cost+ratio*c_cost)
         
         # Solver details
