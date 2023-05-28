@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 
 #Spotprice data clean
 el = pd.read_csv('Elspotprices.csv', sep=';', decimal=',')
@@ -17,7 +18,23 @@ el_dk1 = el_dk1.ffill()
 el_dk1 = el_dk1.set_index('HourDK')
 el_dk1 = el_dk1.drop(['PriceArea'],axis=1)
 
+#To change to low prices!!!!-------------------------------------------------------------------------------------------------------
+el_dk1 = el_dk1.loc[~el_dk1.index.duplicated(), :] #Remove duplicate indices
+
+
+el_dk1_low = el_dk1.loc["2018-01-01 00:00:00":"2019-12-31 23:00:00"] #No data until 2018-01-01 00:00:00, which is not early enough
+                                                                     #This means that we're missing 240 hours, so append those
+
+oldspotprices = el_dk1_low["SpotPriceDKK"].to_numpy()
+oldspotprices = np.append(np.ones((240))*-100,oldspotprices)
+
 el_dk1 = el_dk1.loc["2020-12-22 00:00:00":"2022-12-31 23:00:00"] #Start at earliest prod/cons value, end before nans
+
+#Following line changes the high prices to low:
+#el_dk1["SpotPriceDKK"] = oldspotprices
+
+#To change to low prices!!!!-------------------------------------------------------------------------------------------------------
+
 
 
 #Emissions data clean
