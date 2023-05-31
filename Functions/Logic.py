@@ -2,7 +2,7 @@ import pandas as pd
 from dateutil.relativedelta import relativedelta
 from copy import deepcopy
 
-def get_price(surplus, spot_price, percentage_cut):
+def get_price(surplus, spot_price, percentage_cut, fee=0):
     '''
     Returns cost of buying surplus (kWh) amount at price of spot_price (DKK/kWh)
     when surplus is negative, when positive returns the negative cost of selling 
@@ -38,12 +38,14 @@ def get_price(surplus, spot_price, percentage_cut):
     Example: get_price(-5.5, 0.154039, 0.1) #= 0.8472145
     '''
     
-    #Sell
-    if surplus > 0:
-        return -surplus * spot_price*percentage_cut
-    #Buy
-    else:
-        return -surplus * spot_price
+    if fee is None:
+    
+        #Sell
+        if surplus > 0:
+            return -surplus * (spot_price+fee) *percentage_cut
+        #Buy
+        else:
+            return -surplus * spot_price
 
     
 def get_emissions(surplus, emission):
@@ -217,7 +219,7 @@ def _logic_rollout(series_battery, battery, actions):
         series_battery = series_battery.apply(lambda row: logic_bat(row, battery), axis=1)
     
     fee = 1 #transmission fee
-    series_battery["cost"] = series_battery.apply(lambda row: get_price(row["surplus"], fee+row["SpotPriceDKK"]/1000,0.1), axis=1)
+    series_battery["cost"] = series_battery.apply(lambda row: get_price(row["surplus"], row["SpotPriceDKK"]/1000,0.1,fee), axis=1)
     series_battery["emission"] = series_battery.apply(lambda row: get_emissions(row["surplus"],row["CO2Emission"]/1000), axis=1)
     series_battery["cost_cummulative"] = series_battery["cost"].cumsum(axis=0)
     series_battery["emission_cummulative"] = series_battery["emission"].cumsum(axis=0)
