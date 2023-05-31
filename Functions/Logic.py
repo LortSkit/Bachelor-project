@@ -40,10 +40,10 @@ def get_price(surplus, spot_price, percentage_cut, fee=0):
 
     #Sell
     if surplus > 0:
-        return -surplus * (spot_price+fee) *percentage_cut
+        return -surplus * spot_price *percentage_cut
     #Buy
     else:
-        return -surplus * spot_price
+        return -surplus * (spot_price+fee)
 
     
 def get_emissions(surplus, emission):
