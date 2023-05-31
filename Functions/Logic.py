@@ -37,15 +37,13 @@ def get_price(surplus, spot_price, percentage_cut, fee=0):
     
     Example: get_price(-5.5, 0.154039, 0.1) #= 0.8472145
     '''
-    
-    if fee is None:
-    
-        #Sell
-        if surplus > 0:
-            return -surplus * (spot_price+fee) *percentage_cut
-        #Buy
-        else:
-            return -surplus * spot_price
+
+    #Sell
+    if surplus > 0:
+        return -surplus * (spot_price+fee) *percentage_cut
+    #Buy
+    else:
+        return -surplus * spot_price
 
     
 def get_emissions(surplus, emission):
