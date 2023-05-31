@@ -34,8 +34,13 @@ def get_price(surplus, spot_price, percentage_cut, fee=0):
                     have to be paid, which means when percentage_cut=0.1 (report standard) then
                     there's 90% taxes
                     
+    fee: float, optional, the transmission fee. Is 0 by default
+         
+         For the report, the fee is =1 in all cases
+                    
     
-    Example: get_price(-5.5, 0.154039, 0.1) #= 0.8472145
+    Example: get_price(-5.5, 0.154039, 0.1)    #= 0.8472145
+             get_price(-5.5, 0.154039, 0.1, 1) #= 6.3472145
     '''
 
     #Sell
