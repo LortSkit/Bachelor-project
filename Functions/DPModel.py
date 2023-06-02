@@ -210,9 +210,10 @@ class DPModel:
         yieldd = self.get_yield(k)
         charge = u[0]
         
-        fee = 1 #transmission fee
+        working_month = self.timeline[0].month
+        tax = 0.9 if working_month<=6 else (0.763 if working_month <=9 else 0.723) #Only correct for 2022
         
-        return get_price(yieldd-charge,fee+self.sp[k],0.1)
+        return get_price(yieldd-charge,self.sp[k],0.1,tax)
     
     def gN(self, x):
         """
@@ -599,8 +600,11 @@ class DPModel_both(DPModel_c):
         super().__init__(Start, End, merged, battery,degrade,ints,acts,acts_range)
         self.ratio = ratio
         
-        fee = 1 #transmission fee
-        self.sp = self.sp+fee
+        
+        working_month = self.timeline[0].month
+        tax = 0.9 if working_month<=6 else (0.763 if working_month <=9 else 0.723) #Only correct for 2022
+        
+        self.sp = self.sp+tax
         
         self.sp = self.norm(self.sp)
         self.ep = self.norm(self.ep)
@@ -663,7 +667,10 @@ class DPModel_both(DPModel_c):
         yieldd = self.get_yield(k)
         charge = u[0]
         
-        return (1-self.ratio)*get_price(yieldd-charge,self.sp[k],0.1)+self.ratio*get_emissions(yieldd-charge,self.ep[k]) 
+        working_month = self.timeline[0].month
+        tax = 0.9 if working_month<=6 else (0.763 if working_month <=9 else 0.723) #Only correct for 2022
+        
+        return (1-self.ratio)*get_price(yieldd-charge,self.sp[k]-tax,tax)+self.ratio*get_emissions(yieldd-charge,self.ep[k]) 
     
 class DP_central(DPModel):
     '''
@@ -937,11 +944,12 @@ class DP_central(DPModel):
         yields = self.get_yield(k)
         surpluses = [yields[i]-u[i] for i in range(len(u))]
         
-        fee = 1 #transmission fee
+        working_month = self.timeline[0].month
+        tax = 0.9 if working_month<=6 else (0.763 if working_month <=9 else 0.723) #Only correct for 2022
         
         participants = {self.houses[i]: surpluses[i] for i in range(len(u))}
     
-        em = EnergyMarket(participants, self.sp[k], self.sp[k]+fee)
+        em = EnergyMarket(participants, self.sp[k], self.sp[k]+tax)
         
         dic = em.get_total_costs()
         
@@ -2275,8 +2283,12 @@ class DP_P2P:
         emissions = pd.DataFrame()
         split_costs = []
         split_emis  = []
+        
+        working_month = self.ep.index[0].month
+        tax = 0.9 if working_month<=6 else (0.763 if working_month <=9 else 0.723) #Only correct for 2022
+        
         for i in range(len(nf)):
-            em = EnergyMarket(nf.iloc[i].to_dict(),self.sp[i],self.sp[i]+1)
+            em = EnergyMarket(nf.iloc[i].to_dict(),self.sp[i],self.sp[i]+tax)
             temp = pd.DataFrame(em.get_total_costs(), index=[0])
             costs = pd.concat([costs,temp],ignore_index=True)
             

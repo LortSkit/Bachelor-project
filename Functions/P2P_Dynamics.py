@@ -124,7 +124,7 @@ class EnergyMarket:
                 self.buyers[name] = buyer
             else:
                 if not emissions:
-                    seller = Seller(name, self.price, 0.1, value)
+                    seller = Seller(name, self.price, 1, value)
                 else:
                     seller = Seller(name, self.grid_price, 1, value)
                 self.sellers[name] = seller

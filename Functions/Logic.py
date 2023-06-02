@@ -2,7 +2,7 @@ import pandas as pd
 from dateutil.relativedelta import relativedelta
 from copy import deepcopy
 
-def get_price(surplus, spot_price, percentage_cut, fee=0):
+def get_price(surplus, spot_price, tax=0):
     '''
     Returns cost of buying surplus (kWh) amount at price of spot_price (DKK/kWh)
     when surplus is negative, when positive returns the negative cost of selling 
@@ -27,28 +27,20 @@ def get_price(surplus, spot_price, percentage_cut, fee=0):
              
                 The spot prices are "officially" obtained from the "merge"
                 function from file "Merge.py"
-                
-    percentage_cut: float, between 0 and 1, determines sell value buy percentage_cut*spot_price 
-             
-                    This is to emulate the fact that when selling to the grid, taxes
-                    have to be paid, which means when percentage_cut=0.1 (report standard) then
-                    there's 90% taxes
                     
-    fee: float, optional, the transmission fee. Is 0 by default
+    tax: float, optional, the transmission fee. Is 0 by default
          
-         For the report, the fee is =1 in all cases
-                    
-    
-    Example: get_price(-5.5, 0.154039, 0.1)    #= 0.8472145
-             get_price(-5.5, 0.154039, 0.1, 1) #= 6.3472145
+         Tax is based on https://skat.dk/data.aspx?oid=2246453,
+         but is only correctly based on 2022, since that is when
+         we run the data for in the report
     '''
 
     #Sell
     if surplus > 0:
-        return -surplus * spot_price *percentage_cut
+        return -surplus * spot_price
     #Buy
     else:
-        return -surplus * (spot_price+fee)
+        return -surplus * (spot_price+tax)
 
     
 def get_emissions(surplus, emission):
@@ -221,8 +213,11 @@ def _logic_rollout(series_battery, battery, actions):
     else:
         series_battery = series_battery.apply(lambda row: logic_bat(row, battery), axis=1)
     
-    fee = 1 #transmission fee
-    series_battery["cost"] = series_battery.apply(lambda row: get_price(row["surplus"], row["SpotPriceDKK"]/1000,0.1,fee), axis=1)
+    working_month = series_battery.index[0].month
+    tax = 0.9 if working_month<=6 else (0.763 if working_month <=9 else 0.723) #Only correct for 2022
+    
+    
+    series_battery["cost"] = series_battery.apply(lambda row: get_price(row["surplus"], row["SpotPriceDKK"]/1000,tax), axis=1)
     series_battery["emission"] = series_battery.apply(lambda row: get_emissions(row["surplus"],row["CO2Emission"]/1000), axis=1)
     series_battery["cost_cummulative"] = series_battery["cost"].cumsum(axis=0)
     series_battery["emission_cummulative"] = series_battery["emission"].cumsum(axis=0)
