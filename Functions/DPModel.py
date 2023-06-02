@@ -213,7 +213,7 @@ class DPModel:
         working_month = self.timeline[0].month
         tax = 0.9 if working_month<=6 else (0.763 if working_month <=9 else 0.723) #Only correct for 2022
         
-        return get_price(yieldd-charge,self.sp[k],0.1,tax)
+        return get_price(yieldd-charge,self.sp[k],tax)
     
     def gN(self, x):
         """
