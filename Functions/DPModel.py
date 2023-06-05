@@ -848,7 +848,7 @@ class DP_central(DPModel):
                 temp = self.states[i]
                 self.states[i] = temp[temp%self.furthers[i][0]==self.furthers[i][1]]
 
-        self.s = np.array(np.meshgrid(*self.states)).T.reshape(-1,3)
+        self.s = np.array(np.meshgrid(*self.states)).T.reshape(-1,len(self.houses))
         self.s = self.s.tolist()
         self.s = [tuple(x) for x in self.s]
     
@@ -987,7 +987,7 @@ class DP_central(DPModel):
                 if self.traj_range[i]==0.0:
                     self.states[i] = self.traj[k][i]
                 
-            temp = np.array(np.meshgrid(*self.states)).T.reshape(-1,3)
+            temp = np.array(np.meshgrid(*self.states)).T.reshape(-1,len(self.houses))
             temp = temp.tolist()
             temp = [tuple(x) for x in temp]
             
@@ -1049,7 +1049,7 @@ class DP_central(DPModel):
         if self.ints and self.furthers is not None: #Assumes no degrading is done
             states = [states[i][(states[i]+x[i])%self.furthers[i][0]==self.furthers[i][1]] for i in range(len(x))]
             
-        actions = np.array(np.meshgrid(*states)).T.reshape(-1,3)
+        actions = np.array(np.meshgrid(*states)).T.reshape(-1,len(self.houses))
         if len(actions)>self.max_number_states:
             idx = np.round(np.linspace(0, len(actions) - 1, self.max_number_states)).astype(int)
             actions = actions[idx]
